@@ -28,6 +28,14 @@
 
         </activity>
 
+        <activity
+            android:name=".VozActivity"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:noHistory="false"
+            android:exported="true" />
+
         <receiver
             android:name=".FinanzasWidget"
             android:label="Finanzas"
@@ -50,6 +58,12 @@
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
     </application>
+
+    <queries>
+        <intent>
+            <action android:name="android.speech.action.RECOGNIZE_SPEECH" />
+        </intent>
+    </queries>
 
     <!-- Permissions -->
 

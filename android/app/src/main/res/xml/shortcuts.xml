@@ -8,9 +8,8 @@
         android:shortcutLongLabel="@string/sc_voz_largo">
         <intent
             android:action="android.intent.action.VIEW"
-            android:data="finanzas://voz"
             android:targetPackage="ar.finanzas.luis"
-            android:targetClass="ar.finanzas.luis.MainActivity" />
+            android:targetClass="ar.finanzas.luis.VozActivity" />
     </shortcut>
     <shortcut
         android:shortcutId="nuevo"

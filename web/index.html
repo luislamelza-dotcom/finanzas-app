@@ -1523,7 +1523,10 @@ async function pasoMfa(session){
 let APP_LISTA=false, LINK_PEND=null;
 function manejarLink(url){ LINK_PEND=url; if(APP_LISTA) ejecutarLink(); }
 function ejecutarLink(){ const u=LINK_PEND; LINK_PEND=null; if(!u) return;
-  if(/\/\/(voz|nuevo)/.test(u)){ S.tab="movs"; try{localStorage.setItem("fin_tab","movs")}catch(e){} S.year=String(today.getFullYear()); S.month=today.getMonth()+1; render(); openForm(null); if(/\/\/voz/.test(u)) dictar(); } }
+  if(/\/\/(voz|nuevo)/.test(u)){ S.tab="movs"; try{localStorage.setItem("fin_tab","movs")}catch(e){} S.year=String(today.getFullYear()); S.month=today.getMonth()+1; render(); closeForm(); openForm(null);
+    const m=u.match(/[?&]t=([^&]*)/); const dicho=m?decodeURIComponent(m[1].replace(/\+/g," ")):"";
+    if(dicho){ F._q=dicho; drawForm(); quickParse(); }   // ya se grabó desde el widget: completar y confirmar
+    else if(/\/\/voz/.test(u)) dictar(); } }
 async function dictar(){
   if(!document.getElementById("movForm")) openForm(null);
   readForm(); F._qmsg="Escuchando… hablá cuando aparezca el micrófono"; drawForm();
