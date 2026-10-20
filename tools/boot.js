@@ -54,7 +54,7 @@ const localDownloads={ async save({filename,data}){
 
 async function iniciarApp(session){
   USER_MAIL=session.user.email||""; $("#login").hidden=true; $("#app").hidden=false;
-  downloads=localDownloads; db=makeDb(session.user.id); mfaCargar();
+  downloads=localDownloads; db=makeDb(session.user.id); sample=crearSample(); mfaCargar();
   render();
   const onErr=e=>{ if(e&&e.code==="revoked"){ offline=true; render(); } else toast("No se pudo leer la base de datos. Revisá tu conexión."); };
   db.collection("meses").onSnapshot(snap=>{ const m={}; snap.docs.forEach(d=>{ m[d.id]=d.data(); }); S.meses=m; S.loaded.meses=true;
@@ -142,6 +142,30 @@ async function dictar(){
 }
 document.addEventListener("click",ev=>{ const el=ev.target.closest&&ev.target.closest("[data-act=qvoz]"); if(el&&F&&!F._qbusy) dictar(); });
 if(window.NATIVO) NATIVO.onLink(manejarLink);
+
+
+/* ---------- IA: Claude vía la función de Supabase (la clave nunca está en la app) ---------- */
+function blobB64(b){ return new Promise((ok,ko)=>{ const r=new FileReader(); r.onload=()=>ok(String(r.result).split(",")[1]||""); r.onerror=ko; r.readAsDataURL(b); }); }
+function crearSample(){
+  const call=async(input,opts={},asJson=false)=>{
+    if(opts.signal&&opts.signal.aborted) throw {code:"cancelled"};
+    const images=[]; if(opts.images){ for(const b of Array.from(opts.images.length!=null?opts.images:[opts.images]).slice(0,5)) images.push({type:b.type||"image/jpeg",data:await blobB64(b)}); }
+    const {data,error}=await SB.functions.invoke("claude",{body:{input,tier:opts.modelTier||"default",json:asJson,images}});
+    if(opts.signal&&opts.signal.aborted) throw {code:"cancelled"};
+    if(error){ let code="upstream_error", message=error.message; try{ const b=await error.context.json(); code=b.code||code; message=b.message||message; }catch(e){} throw {code,message}; }
+    if(opts.onText) try{ opts.onText({text:data.text,delta:data.text}); }catch(e){}
+    return {text:data.text,truncated:!!data.truncated,modelTierApplied:opts.modelTier||"default"};
+  };
+  const f=(input,opts)=>call(input,opts,false);
+  f.json=async(input,opts)=>{ const d=await call(input,opts,true); const t=(d.text||"").trim();
+    try{ return JSON.parse(t); }catch(e){}
+    const m=t.match(/```(?:json)?\s*([\s\S]*?)```/); if(m) try{ return JSON.parse(m[1]); }catch(e){}
+    const ii=[t.indexOf("{"),t.indexOf("[")].filter(x=>x>=0); const i=ii.length?Math.min(...ii):-1, k=Math.max(t.lastIndexOf("}"),t.lastIndexOf("]"));
+    if(i>=0&&k>i) try{ return JSON.parse(t.slice(i,k+1)); }catch(e){}
+    throw {code:"invalid_json",message:"La respuesta no era JSON",text:t}; };
+  f.limits=async()=>({maxPromptBytes:262144,images:{maxCount:5,maxInputBytes:5e6,mediaTypes:["image/jpeg","image/png","image/webp"]}});
+  return f;
+}
 
 async function importarRespaldo(){
   const docs=S.impB&&S.impB.docs; if(!docs) return; S.impB=null; render(); toast("Importando…");

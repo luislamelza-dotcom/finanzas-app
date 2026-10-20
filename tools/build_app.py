@@ -72,7 +72,7 @@ R('''  if(!mcp) return `<div class="banner" style="margin-bottom:14px">La lectur
 R("${!F._orig&&sample?`<div class=\"quick\">", "${!F._orig&&(sample||typeof parseLocal===\"function\")?`<div class=\"quick\">")
 R("""<button type="button" class="btn sm" data-act="qparse">${F._qbusy?'<span class="spin"></span> Interpretando…':"Completar con esto"}</button>""",
   """<span class="row" style="gap:6px">${window.NATIVO&&NATIVO.puedeVoz?`<button type="button" class="btn sm" data-act="qvoz" aria-label="Dictar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" style="vertical-align:-2px"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg> Dictar</button>`:""}<button type="button" class="btn sm" data-act="qparse">${F._qbusy?'<span class="spin"></span> Interpretando…':"Completar con esto"}</button></span>""")
-R("const r=await sample.json(prompt,{modelTier:\"quick\",cache:false});", "const r=sample? await sample.json(prompt,{modelTier:\"quick\",cache:false}) : parseLocal(txt,c);")
+R("const r=await sample.json(prompt,{modelTier:\"quick\",cache:false});", "const r=sample? await sample.json(prompt,{modelTier:\"quick\",cache:false}).catch(()=>parseLocal(txt,c)) : parseLocal(txt,c);")
 
 # ---- Ajustes: cuenta e importación
 R('''  <section class="card"><div class="sec-h"><h2>Respaldo</h2></div>''', '''  <section class="card"><div class="sec-h"><h2>Cuenta</h2><p>${esc(USER_MAIL||"")}</p></div><button class="btn" data-act="logout">Cerrar sesión</button></section>
