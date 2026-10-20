@@ -59,7 +59,7 @@ async function iniciarApp(session){
   const onErr=e=>{ if(e&&e.code==="revoked"){ offline=true; render(); } else toast("No se pudo leer la base de datos. Revisá tu conexión."); };
   db.collection("meses").onSnapshot(snap=>{ const m={}; snap.docs.forEach(d=>{ m[d.id]=d.data(); }); S.meses=m; S.loaded.meses=true;
     if(!S._init){ S._init=true; const ks=Object.keys(m).sort(); const cy=String(today.getFullYear()); if(!ks.some(k=>k.startsWith(cy))&&ks.length){ S.year=ks[ks.length-1].slice(0,4); } }
-    render(); }, onErr);
+    render(); if(!APP_LISTA){ APP_LISTA=true; setTimeout(ejecutarLink,50); } }, onErr);
   db.doc("config/main").onSnapshot(d=>{ S.cfg=d.exists?d.data():null; S.loaded.cfg=true; if(S.cfg&&S.cfg.tema) aplicarTema(S.cfg.tema); render(); }, onErr);
   db.doc("config/reglas").onSnapshot(d=>{ S.reglas=d.exists?(d.data().map||{}):{}; render(); }, onErr);
   db.doc("config/mercado").onSnapshot(d=>{ S.mercado=d.exists?d.data():null; render(); }, onErr);
@@ -122,6 +122,23 @@ async function pasoMfa(session){
   }
   iniciarApp(session);
 }
+
+
+/* ---------- Widget del celu y dictado ---------- */
+let APP_LISTA=false, LINK_PEND=null;
+function manejarLink(url){ LINK_PEND=url; if(APP_LISTA) ejecutarLink(); }
+function ejecutarLink(){ const u=LINK_PEND; LINK_PEND=null; if(!u) return;
+  if(/\/\/(voz|nuevo)/.test(u)){ S.tab="movs"; try{localStorage.setItem("fin_tab","movs")}catch(e){} S.year=String(today.getFullYear()); S.month=today.getMonth()+1; render(); openForm(null); if(/\/\/voz/.test(u)) dictar(); } }
+async function dictar(){
+  if(!document.getElementById("movForm")) openForm(null);
+  readForm(); F._qmsg="Escuchando… hablá cuando aparezca el micrófono"; drawForm();
+  try{ const txt=await NATIVO.voz();
+    if(!txt){ F._qmsg="No te escuché. Tocá Dictar y probá de nuevo."; drawForm(); return; }
+    F._q=txt; F._qmsg=""; drawForm(); await quickParse();
+  }catch(e){ F._qmsg = e&&e.message==="permiso" ? "Necesito permiso para usar el micrófono (Ajustes del celu → Apps → Finanzas → Permisos)." : "No se pudo usar el micrófono en este dispositivo."; drawForm(); }
+}
+document.addEventListener("click",ev=>{ const el=ev.target.closest&&ev.target.closest("[data-act=qvoz]"); if(el&&F&&!F._qbusy) dictar(); });
+if(window.NATIVO) NATIVO.onLink(manejarLink);
 
 async function importarRespaldo(){
   const docs=S.impB&&S.impB.docs; if(!docs) return; S.impB=null; render(); toast("Importando…");

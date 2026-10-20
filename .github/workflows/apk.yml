@@ -2,34 +2,43 @@ name: Armar APK
 on:
   push:
     branches: [main]
-    paths: ["web/**", "capacitor.config.json", "package.json"]
+    paths: ["web/**", "android/**", "capacitor.config.json", "package.json"]
   workflow_dispatch:
 permissions:
   contents: write
+concurrency: { group: apk, cancel-in-progress: false }
 jobs:
   apk:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: 20 }
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: 22 }
+      - uses: actions/setup-java@v5
         with: { distribution: temurin, java-version: 17 }
-      - run: npm install
-      - run: npx cap add android
-      - name: Íconos
+      - name: Revisar la firma
+        env: { KS_PASS: "${{ secrets.ANDROID_KEYSTORE_PASS }}" }
         run: |
-          for d in mipmap-mdpi mipmap-hdpi mipmap-xhdpi mipmap-xxhdpi mipmap-xxxhdpi; do
-            cp web/icon-192.png android/app/src/main/res/$d/ic_launcher.png
-            cp web/icon-192.png android/app/src/main/res/$d/ic_launcher_round.png
-            cp web/icon-maskable-192.png android/app/src/main/res/$d/ic_launcher_foreground.png || true
-          done
+          if [ -z "$KS_PASS" ]; then echo "::error::Falta el secreto ANDROID_KEYSTORE_PASS (Settings → Secrets and variables → Actions)."; exit 1; fi
+      - run: npm install --no-audit --no-fund
       - run: npx cap sync android
       - name: Compilar
-        run: cd android && chmod +x gradlew && ./gradlew assembleDebug --no-daemon
+        env:
+          KS_PASS: "${{ secrets.ANDROID_KEYSTORE_PASS }}"
+          VERSION_CODE: "${{ github.run_number }}"
+        run: |
+          cd android && chmod +x gradlew
+          set +e
+          ./gradlew assembleRelease --no-daemon 2>&1 | tee ../build.log
+          status=${PIPESTATUS[0]}
+          if [ $status -ne 0 ]; then
+            msg=$(grep -E "error:|What went wrong|FAILURE|\.java:[0-9]+|\.xml:[0-9]+|Exception" -A4 ../build.log | head -60 | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
+            echo "::error title=Falló la compilación::$msg"
+            exit 1
+          fi
       - name: Publicar en Releases
         env: { GH_TOKEN: "${{ github.token }}" }
         run: |
-          cp android/app/build/outputs/apk/debug/app-debug.apk Finanzas.apk
-          TAG="v$(date -u +%Y%m%d-%H%M)-${{ github.run_number }}"
-          gh release create "$TAG" Finanzas.apk --title "Finanzas $TAG" --notes "APK generado automáticamente. Descargalo desde el celu e instalalo."
+          cp android/app/build/outputs/apk/release/app-release.apk Finanzas.apk
+          TAG="v1.${{ github.run_number }}"
+          gh release create "$TAG" Finanzas.apk --title "Finanzas $TAG" --notes "Versión $TAG. Descargala desde el celu e instalala encima de la anterior."

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="voz"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/sc_voz"
+        android:shortcutLongLabel="@string/sc_voz_largo">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="finanzas://voz"
+            android:targetPackage="ar.finanzas.luis"
+            android:targetClass="ar.finanzas.luis.MainActivity" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="nuevo"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/sc_nuevo"
+        android:shortcutLongLabel="@string/sc_nuevo_largo">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="finanzas://nuevo"
+            android:targetPackage="ar.finanzas.luis"
+            android:targetClass="ar.finanzas.luis.MainActivity" />
+    </shortcut>
+</shortcuts>

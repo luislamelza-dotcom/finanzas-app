@@ -44,6 +44,7 @@ R('''<header class="top">''', '''</head>
 <header class="top">''')
 R('''<div id="toastRoot"></div>''', '''<div id="toastRoot"></div>
 </div>
+<script src="native.js"></script>
 <script src="supabase.js"></script>
 <script src="config.js"></script>''')
 i = s.rindex('</script>')
@@ -66,6 +67,13 @@ R('''  if(!sample) h+=`<div class="banner">Esta función usa Claude desde la pá
 R('''  if(!mcp) return `<div class="banner" style="margin-bottom:14px">La lectura desde Google Drive no está disponible en esta vista.</div>`;''',
   '''  if(!mcp) return "";''')
 
+
+# ---- carga rápida: también sin IA (intérprete local) y con micrófono
+R("${!F._orig&&sample?`<div class=\"quick\">", "${!F._orig&&(sample||typeof parseLocal===\"function\")?`<div class=\"quick\">")
+R("""<button type="button" class="btn sm" data-act="qparse">${F._qbusy?'<span class="spin"></span> Interpretando…':"Completar con esto"}</button>""",
+  """<span class="row" style="gap:6px">${window.NATIVO&&NATIVO.puedeVoz?`<button type="button" class="btn sm" data-act="qvoz" aria-label="Dictar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" style="vertical-align:-2px"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg> Dictar</button>`:""}<button type="button" class="btn sm" data-act="qparse">${F._qbusy?'<span class="spin"></span> Interpretando…':"Completar con esto"}</button></span>""")
+R("const r=await sample.json(prompt,{modelTier:\"quick\",cache:false});", "const r=sample? await sample.json(prompt,{modelTier:\"quick\",cache:false}) : parseLocal(txt,c);")
+
 # ---- Ajustes: cuenta e importación
 R('''  <section class="card"><div class="sec-h"><h2>Respaldo</h2></div>''', '''  <section class="card"><div class="sec-h"><h2>Cuenta</h2><p>${esc(USER_MAIL||"")}</p></div><button class="btn" data-act="logout">Cerrar sesión</button></section>
   ${mfaBlock()}
@@ -78,6 +86,6 @@ R('''  <section class="card"><div class="sec-h"><h2>Respaldo</h2></div>''', ''' 
 # ---- arranque con Supabase en lugar de window.claude
 a = s.index('/* ---------- Arranque ---------- */\nrender();')
 b = s.rindex('</script>\n</body>')
-s = s[:a] + open(__file__.replace('build_app.py', 'boot.js')).read() + s[b:]
+s = s[:a] + open(__file__.replace('build_app.py', 'parse-local.js')).read() + '\n' + open(__file__.replace('build_app.py', 'boot.js')).read() + s[b:]
 open(__file__.replace('tools/build_app.py', 'web/index.html'), 'w').write(s)
 print('ok', len(s))
