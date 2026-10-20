@@ -1,0 +1,15 @@
+{
+  "name": "finanzas-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "App personal de finanzas (web + Android)",
+  "scripts": {
+    "android:sync": "npx cap sync android"
+  },
+  "dependencies": {
+    "@capacitor/android": "6.1.2",
+    "@capacitor/cli": "6.1.2",
+    "@capacitor/core": "6.1.2",
+    "@supabase/supabase-js": "2.45.4"
+  }
+}
