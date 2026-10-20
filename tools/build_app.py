@@ -74,6 +74,11 @@ R("""<button type="button" class="btn sm" data-act="qparse">${F._qbusy?'<span cl
   """<span class="row" style="gap:6px">${window.NATIVO&&NATIVO.puedeVoz?`<button type="button" class="btn sm" data-act="qvoz" aria-label="Dictar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" style="vertical-align:-2px"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg> Dictar</button>`:""}<button type="button" class="btn sm" data-act="qparse">${F._qbusy?'<span class="spin"></span> Interpretando…':"Completar con esto"}</button></span>""")
 R("const r=await sample.json(prompt,{modelTier:\"quick\",cache:false});", "const r=sample? await sample.json(prompt,{modelTier:\"quick\",cache:false}).catch(()=>parseLocal(txt,c)) : parseLocal(txt,c);")
 
+
+# ---- valor mensual de la cartera: lo guarda solo la función de cotizaciones
+R("""${snaps.length?"Valor a fin de mes: "+snaps.slice(-6).map(([k,v])=>`${MES[+k.slice(5)-1]} ${k.slice(2,4)}: ${usd(v)}`).join(" · "):"Guardá el valor de la cartera una vez por mes para ver cómo evoluciona."}</span><button class="btn sm" data-act="snap" ${pos.length?"":"disabled"}>Guardar valor de este mes</button></div>""",
+  """${snaps.length?"Valor al cierre de cada mes: "+snaps.slice(-6).map(([k,v])=>`${MES[+k.slice(5)-1]} ${k.slice(2,4)}: ${usd(v)}`).join(" · "):"El valor de la cartera se guarda solo cada día hábil; el último de cada mes queda como cierre."}</span></div>""")
+
 # ---- Ajustes: cuenta e importación
 R('''  <section class="card"><div class="sec-h"><h2>Respaldo</h2></div>''', '''  <section class="card"><div class="sec-h"><h2>Cuenta</h2><p>${esc(USER_MAIL||"")}</p></div><button class="btn" data-act="logout">Cerrar sesión</button></section>
   ${mfaBlock()}

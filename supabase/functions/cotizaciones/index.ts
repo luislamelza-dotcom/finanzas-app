@@ -73,6 +73,15 @@ Deno.serve(async (req: Request) => {
     }
   }
 
+  // 4. Valor de la cartera al día: se guarda en snaps[mes]; la última corrida del mes queda como cierre
+  if (items.length) {
+    const valor = items.reduce((a, p) => a + (Number(p.cant) || 0) * (precios[String(p.ticker).toUpperCase()]?.usd ?? (Number(p.precio) || 0)), 0);
+    const mes = hoyAR().slice(0, 7);
+    const cart: any = { ...(cartRow!.data as any) };
+    cart.snaps = { ...(cart.snaps ?? {}), [mes]: Math.round(valor * 100) / 100 };
+    await db.from("docs").update({ data: cart }).eq("user_id", DUENO).eq("col", "config").eq("id", "cartera");
+  }
+
   const mercado = { mep, uva, precios, actualizado: ahoraAR(), fuente: "MEP: dolarapi.com · UVA: BCRA · Precios: data912.com (BYMA)", errores };
   const { error } = await db.from("docs").upsert({ user_id: DUENO, col: "config", id: "mercado", data: mercado }, { onConflict: "user_id,col,id" });
   if (error) return json({ ok: false, error: error.message }, 500);
