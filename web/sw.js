@@ -1,5 +1,5 @@
 // Guarda la app para que abra rápido y sin conexión. Los datos siempre vienen de Supabase.
-const CACHE = "finanzas-v1";
+const CACHE = "finanzas-v2";
 const APP = ["./", "index.html", "supabase.js", "config.js", "manifest.webmanifest", "icon.svg", "icon-192.png", "icon-512.png"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(APP)).then(() => self.skipWaiting())); });
 self.addEventListener("activate", e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });

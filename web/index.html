@@ -189,6 +189,14 @@ details summary{cursor:pointer;font-weight:600}
     <button class="btn pri" type="submit" id="lgBtn">Entrar</button>
     <p class="out" id="lgErr" style="margin:0;min-height:1.2em"></p>
   </form>
+  <form id="mfaForm" class="login-card" hidden>
+    <h1>Código de verificación</h1>
+    <p class="muted" style="margin:0">Abrí tu app de autenticación (Google Authenticator, Authy…) y poné el código de 6 números de Finanzas.</p>
+    <label class="field">Código<input id="mfaCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" required></label>
+    <button class="btn pri" type="submit" id="mfaBtn">Verificar</button>
+    <button class="btn" type="button" id="mfaSalir">Salir</button>
+    <p class="out" id="mfaErr" style="margin:0;min-height:1.2em"></p>
+  </form>
 </div>
 <div id="app" hidden>
 <header class="top">
@@ -1119,6 +1127,7 @@ function vAjustes(){
     ${reglas.length?`<div class="tablewrap"><table><thead><tr><th>Comercio</th><th>Categoría</th><th></th></tr></thead><tbody>${reglas.map(([k,v])=>`<tr><td>${esc(v.ej||k)}</td><td>${esc(v.cat)} › ${esc(v.sub)}</td><td class="r"><button class="btn sm danger" data-act="delregla" data-k="${esc(k)}">Olvidar</button></td></tr>`).join("")}</tbody></table></div>`:'<p class="muted" style="margin:0">Todavía no hay comercios aprendidos.</p>'}
   </section>
   <section class="card"><div class="sec-h"><h2>Cuenta</h2><p>${esc(USER_MAIL||"")}</p></div><button class="btn" data-act="logout">Cerrar sesión</button></section>
+  ${mfaBlock()}
   <section class="card"><div class="sec-h"><h2>Importar respaldo</h2><p>El archivo JSON que descargás desde la web de claude.ai o desde acá</p></div>
     <label class="btn" for="impBackup" style="display:inline-block">Elegir archivo de respaldo</label><input id="impBackup" type="file" accept="application/json,.json" hidden>
     ${S.impB?`<div style="margin-top:12px;display:grid;gap:8px"><p style="margin:0">El archivo trae ${S.impB.n} documentos (${esc(S.impB.resumen)}). Si ya tenés datos con el mismo nombre, se reemplazan.</p><div class="row"><button class="btn" data-act="impbno">Cancelar</button><button class="btn pri" data-act="impbsi">Importar</button></div></div>`:""}
@@ -1338,7 +1347,7 @@ const localDownloads={ async save({filename,data}){
 
 async function iniciarApp(session){
   USER_MAIL=session.user.email||""; $("#login").hidden=true; $("#app").hidden=false;
-  downloads=localDownloads; db=makeDb(session.user.id);
+  downloads=localDownloads; db=makeDb(session.user.id); mfaCargar();
   render();
   const onErr=e=>{ if(e&&e.code==="revoked"){ offline=true; render(); } else toast("No se pudo leer la base de datos. Revisá tu conexión."); };
   db.collection("meses").onSnapshot(snap=>{ const m={}; snap.docs.forEach(d=>{ m[d.id]=d.data(); }); S.meses=m; S.loaded.meses=true;
@@ -1350,6 +1359,61 @@ async function iniciarApp(session){
   db.collection("resumenes").onSnapshot(snap=>{ const m={}; snap.docs.forEach(d=>{ const v=d.data(); if(v&&Array.isArray(v.lineas)) m[d.id]=v; }); S.resumenes=m; render(); }, onErr);
   db.doc("config/drive").onSnapshot(d=>{ S.driveCfg=d.exists?d.data():{procesados:{}}; render(); }, onErr);
   db.doc("config/cartera").onSnapshot(d=>{ S.cartera=d.exists?d.data():{items:[],snaps:{}}; render(); }, onErr);
+}
+
+
+/* ---------- Verificación en dos pasos (TOTP) ---------- */
+S.mfa={factors:null,enroll:null,msg:"",busy:false};
+async function mfaCargar(){ const {data,error}=await SB.auth.mfa.listFactors(); if(error) return; S.mfa.factors=(data.totp||[]).filter(f=>f.status==="verified"); render(); }
+function mfaBlock(){
+  const m=S.mfa; const fs=m.factors;
+  let h=`<section class="card"><div class="sec-h"><h2>Verificación en dos pasos</h2><p>Además de la contraseña, un código de 6 números de una app en tu celu</p></div>`;
+  if(fs===null) return h+`<p class="muted" style="margin:0">Cargando…</p></section>`;
+  if(m.enroll){
+    h+=`<ol style="margin:0;padding-left:20px;display:grid;gap:10px">
+      <li>Instalá en el celu <b>Google Authenticator</b>, <b>Microsoft Authenticator</b> o <b>Authy</b> (cualquiera sirve).</li>
+      <li>En esa app, tocá “Agregar” y escaneá este código:<div style="background:#fff;padding:10px;border-radius:10px;width:max-content;max-width:100%;margin-top:8px"><img src="${m.enroll.qr}" alt="Código QR para la app de autenticación" width="180" height="180"></div>
+        <span class="muted" style="font-size:.84rem">Si estás en el mismo celu y no podés escanear, cargá esta clave a mano: <code style="user-select:all;word-break:break-all">${esc(m.enroll.secret)}</code></span></li>
+      <li>Escribí el código de 6 números que te muestra la app:<form id="mfaEnrollForm" class="row" style="margin-top:6px"><input id="mfaEnrollCode" class="num" inputmode="numeric" autocomplete="one-time-code" maxlength="6" style="width:120px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface)"><button class="btn pri" type="submit" ${m.busy?"disabled":""}>Activar</button><button class="btn" type="button" data-act="mfacancel">Cancelar</button></form></li></ol>`;
+  } else if(fs.length){
+    h+=`<p style="margin:0 0 10px"><span class="in">● Activada</span> en ${fs.length} ${fs.length===1?"dispositivo":"dispositivos"}: ${fs.map(f=>esc(f.friendly_name||"app")).join(", ")}.</p>
+      ${fs.length===1?`<p class="muted" style="margin:0 0 10px;font-size:.86rem">Te recomiendo agregar un segundo dispositivo de respaldo (otro celu, o la misma clave en otra app). Supabase no da códigos de recuperación: si perdés el único, hay que sacarlo desde el panel de Supabase.</p>`:""}
+      <div class="row"><button class="btn" data-act="mfaadd">Agregar otro dispositivo</button>${fs.map(f=>`<button class="btn danger sm" data-act="mfadel" data-id="${f.id}">${S.mfaConfirm===f.id?"Tocá de nuevo para quitar":"Quitar "+esc(f.friendly_name||"app")}</button>`).join("")}</div>`;
+  } else {
+    h+=`<p class="muted" style="margin:0 0 10px">Está desactivada. Si alguien consiguiera tu contraseña, igual no podría entrar sin el código de tu celu.</p><button class="btn pri" data-act="mfaadd">Activar verificación en dos pasos</button>`;
+  }
+  if(m.msg) h+=`<p class="out" style="margin:10px 0 0">${esc(m.msg)}</p>`;
+  return h+`</section>`;
+}
+async function mfaEmpezar(){
+  S.mfa.msg="";
+  const {data:lst}=await SB.auth.mfa.listFactors();
+  for(const f of ((lst&&lst.all)||[]).filter(f=>f.status!=="verified")){ await SB.auth.mfa.unenroll({factorId:f.id}).catch(()=>{}); }
+  const n=((lst&&lst.totp)||[]).filter(f=>f.status==="verified").length;
+  const {data,error}=await SB.auth.mfa.enroll({factorType:"totp",friendlyName:n?"Respaldo "+(n+1):"Celular",issuer:"Finanzas"});
+  if(error){ S.mfa.msg="No se pudo empezar: "+error.message; render(); return; }
+  const q=data.totp.qr_code||""; S.mfa.enroll={id:data.id,qr:q.startsWith("data:")?q:"data:image/svg+xml;utf-8,"+encodeURIComponent(q),secret:data.totp.secret}; render();
+}
+async function mfaConfirmar(code){
+  S.mfa.busy=true; S.mfa.msg=""; render();
+  const {error}=await SB.auth.mfa.challengeAndVerify({factorId:S.mfa.enroll.id,code});
+  S.mfa.busy=false;
+  if(error){ S.mfa.msg="El código no coincide. Revisá que sea el de Finanzas y que la hora del celu esté bien."; render(); return; }
+  S.mfa.enroll=null; toast("Verificación en dos pasos activada"); await mfaCargar();
+}
+document.addEventListener("submit",ev=>{ if(ev.target.id!=="mfaEnrollForm") return; ev.preventDefault(); const c=(document.getElementById("mfaEnrollCode").value||"").replace(/\D/g,""); if(c.length===6) mfaConfirmar(c); });
+document.addEventListener("click",async ev=>{ const el=ev.target.closest&&ev.target.closest("[data-act]"); if(!el) return; const a=el.dataset.act;
+  if(a==="mfaadd") mfaEmpezar();
+  else if(a==="mfacancel"){ const id=S.mfa.enroll&&S.mfa.enroll.id; S.mfa.enroll=null; render(); if(id) SB.auth.mfa.unenroll({factorId:id}).catch(()=>{}); }
+  else if(a==="mfadel"){ if(S.mfaConfirm!==el.dataset.id){ S.mfaConfirm=el.dataset.id; render(); return; } S.mfaConfirm=null; const {error}=await SB.auth.mfa.unenroll({factorId:el.dataset.id}); if(error) toast("No se pudo quitar: "+error.message); else { await SB.auth.refreshSession().catch(()=>{}); toast("Dispositivo quitado"); } mfaCargar(); }
+});
+// Después de la contraseña: si tiene 2FA, pedir el código antes de abrir la app
+async function pasoMfa(session){
+  const {data}=await SB.auth.mfa.getAuthenticatorAssuranceLevel();
+  if(data&&data.nextLevel==="aal2"&&data.currentLevel!=="aal2"){
+    $("#login").hidden=false; $("#loginForm").hidden=true; $("#mfaForm").hidden=false; $("#mfaCode").value=""; $("#mfaCode").focus(); return;
+  }
+  iniciarApp(session);
 }
 
 async function importarRespaldo(){
@@ -1377,12 +1441,18 @@ document.addEventListener("click",async ev=>{ const el=ev.target.closest&&ev.tar
   if(!window.supabase||!C.url||!C.anonKey){ $("#login").hidden=false; $("#lgErr").textContent="Falta configurar la conexión con Supabase (config.js)."; return; }
   SB=window.supabase.createClient(C.url,C.anonKey,{auth:{persistSession:true,autoRefreshToken:true,storageKey:"finanzas-auth"}});
   const {data:{session}}=await SB.auth.getSession();
-  if(session) iniciarApp(session); else $("#login").hidden=false;
+  if(session) pasoMfa(session); else $("#login").hidden=false;
   $("#loginForm").addEventListener("submit",async ev=>{ ev.preventDefault(); const b=$("#lgBtn"); b.disabled=true; $("#lgErr").textContent="";
     const {data,error}=await SB.auth.signInWithPassword({email:$("#lgMail").value.trim(),password:$("#lgPass").value});
     b.disabled=false;
     if(error){ $("#lgErr").textContent=/invalid/i.test(error.message)?"Mail o contraseña incorrectos.":"No se pudo entrar: "+error.message; return; }
-    iniciarApp(data.session); });
+    pasoMfa(data.session); });
+  $("#mfaForm").addEventListener("submit",async ev=>{ ev.preventDefault(); const b=$("#mfaBtn"); const code=($("#mfaCode").value||"").replace(/\D/g,""); if(code.length!==6){ $("#mfaErr").textContent="Son 6 números."; return; } b.disabled=true; $("#mfaErr").textContent="";
+    const {data:lf}=await SB.auth.mfa.listFactors(); const f=((lf&&lf.totp)||[]).find(x=>x.status==="verified");
+    const {error}=f?await SB.auth.mfa.challengeAndVerify({factorId:f.id,code}):{error:{message:"sin factor"}};
+    b.disabled=false; if(error){ $("#mfaErr").textContent="Código incorrecto. Probá con el siguiente que muestre la app."; return; }
+    const {data:{session}}=await SB.auth.getSession(); $("#mfaForm").hidden=true; $("#loginForm").hidden=false; iniciarApp(session); });
+  $("#mfaSalir").addEventListener("click",async()=>{ await SB.auth.signOut(); location.reload(); });
   if("serviceWorker" in navigator && location.protocol==="https:") navigator.serviceWorker.register("sw.js").catch(()=>{});
 })();
 </script>

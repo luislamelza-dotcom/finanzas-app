@@ -31,6 +31,14 @@ R('''<header class="top">''', '''</head>
     <button class="btn pri" type="submit" id="lgBtn">Entrar</button>
     <p class="out" id="lgErr" style="margin:0;min-height:1.2em"></p>
   </form>
+  <form id="mfaForm" class="login-card" hidden>
+    <h1>Código de verificación</h1>
+    <p class="muted" style="margin:0">Abrí tu app de autenticación (Google Authenticator, Authy…) y poné el código de 6 números de Finanzas.</p>
+    <label class="field">Código<input id="mfaCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" required></label>
+    <button class="btn pri" type="submit" id="mfaBtn">Verificar</button>
+    <button class="btn" type="button" id="mfaSalir">Salir</button>
+    <p class="out" id="mfaErr" style="margin:0;min-height:1.2em"></p>
+  </form>
 </div>
 <div id="app" hidden>
 <header class="top">''')
@@ -60,6 +68,7 @@ R('''  if(!mcp) return `<div class="banner" style="margin-bottom:14px">La lectur
 
 # ---- Ajustes: cuenta e importación
 R('''  <section class="card"><div class="sec-h"><h2>Respaldo</h2></div>''', '''  <section class="card"><div class="sec-h"><h2>Cuenta</h2><p>${esc(USER_MAIL||"")}</p></div><button class="btn" data-act="logout">Cerrar sesión</button></section>
+  ${mfaBlock()}
   <section class="card"><div class="sec-h"><h2>Importar respaldo</h2><p>El archivo JSON que descargás desde la web de claude.ai o desde acá</p></div>
     <label class="btn" for="impBackup" style="display:inline-block">Elegir archivo de respaldo</label><input id="impBackup" type="file" accept="application/json,.json" hidden>
     ${S.impB?`<div style="margin-top:12px;display:grid;gap:8px"><p style="margin:0">El archivo trae ${S.impB.n} documentos (${esc(S.impB.resumen)}). Si ya tenés datos con el mismo nombre, se reemplazan.</p><div class="row"><button class="btn" data-act="impbno">Cancelar</button><button class="btn pri" data-act="impbsi">Importar</button></div></div>`:""}
