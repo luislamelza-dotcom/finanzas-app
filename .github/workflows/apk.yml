@@ -31,5 +31,5 @@ jobs:
         env: { GH_TOKEN: "${{ github.token }}" }
         run: |
           cp android/app/build/outputs/apk/debug/app-debug.apk Finanzas.apk
-          TAG="v$(date -u +%Y%m%d-%H%M)"
+          TAG="v$(date -u +%Y%m%d-%H%M)-${{ github.run_number }}"
           gh release create "$TAG" Finanzas.apk --title "Finanzas $TAG" --notes "APK generado automáticamente. Descargalo desde el celu e instalalo."
