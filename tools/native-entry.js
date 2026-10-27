@@ -1,9 +1,10 @@
 // Puente con el celu (Capacitor). En la compu usa el dictado de Chrome si está disponible.
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import { App } from '@capacitor/app';
 import { SpeechRecognition } from '@capacitor-community/speech-recognition';
 
 const esNativo = Capacitor.isNativePlatform();
+const WidgetTema = registerPlugin('WidgetTema');
 const WebSR = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
 
 window.NATIVO = {
@@ -26,6 +27,11 @@ window.NATIVO = {
       rec.onnomatch = () => ok('');
       rec.start();
     });
+  },
+  // Le pasa al widget de inicio el color del tema elegido
+  widgetTema(acc) {
+    if (!esNativo) return Promise.resolve();
+    return WidgetTema.set({ acc }).catch(() => {});
   },
   onLink(cb) {
     if (!esNativo) return;

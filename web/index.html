@@ -9,7 +9,7 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Schibsted+Grotesk:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Schibsted+Grotesk:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Limelight&family=Josefin+Sans:wght@400;600;700&family=Oswald:wght@400;500&display=swap">
 <style>
 /* Layout: barra superior fija con año y MEP, pestañas, contenido en una columna de hasta 1120px; tarjetas solo donde separan objetos */
 :root{
@@ -44,6 +44,12 @@
 :root[data-paleta="grafito"][data-theme="dark"]:not([data-modo="claro"]){ --bg:#0F0F11; --surface:#18181B; --sunk:#202024; --ink:#EDEDEF; --muted:#A0A0A9; --line:#2C2C31; --accent:#E4E4E7; --accent-soft:#2A2A2F; --on-accent:#18181B; --in:#5FC394; --out:#E5826A; --inv:#8EA6F2; --warn:#E0A54A; --warn-soft:#2E2617; color-scheme:dark}
 :root[data-paleta="grafito"][data-modo="oscuro"]{ --bg:#0F0F11; --surface:#18181B; --sunk:#202024; --ink:#EDEDEF; --muted:#A0A0A9; --line:#2C2C31; --accent:#E4E4E7; --accent-soft:#2A2A2F; --on-accent:#18181B; --in:#5FC394; --out:#E5826A; --inv:#8EA6F2; --warn:#E0A54A; --warn-soft:#2E2617; color-scheme:dark}
 *{box-sizing:border-box}
+@font-face{font-family:"Limelight";font-weight:400;font-display:swap;src:url(fonts/limelight-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:"Josefin Sans";font-weight:400;font-display:swap;src:url(fonts/josefin-sans-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:"Josefin Sans";font-weight:600;font-display:swap;src:url(fonts/josefin-sans-latin-600-normal.woff2) format("woff2")}
+@font-face{font-family:"Josefin Sans";font-weight:700;font-display:swap;src:url(fonts/josefin-sans-latin-700-normal.woff2) format("woff2")}
+@font-face{font-family:"Oswald";font-weight:400;font-display:swap;src:url(fonts/oswald-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:"Oswald";font-weight:500;font-display:swap;src:url(fonts/oswald-latin-500-normal.woff2) format("woff2")}
 html{color-scheme:light}
 :root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 body{margin:0;font-size:14px;font-family:var(--f-body)}
@@ -170,6 +176,34 @@ details summary{cursor:pointer;font-weight:600}
 .spin{display:inline-block;width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp 0.8s linear infinite;vertical-align:-2px}
 @keyframes sp{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion: reduce){.spin{animation:none}}
+
+/* Tema Dark Deco: siempre oscuro, fuentes déco, cabecera roja con ciudad */
+html:root[data-paleta="deco"][data-paleta]{--bg:#0B0A0A;--surface:#151211;--sunk:#1E1A18;--ink:#EDE3CF;--muted:#A99F8E;--line:#3A3430;--accent:#C9A24A;--accent-soft:#2B2112;--on-accent:#0B0A0A;--in:#7DBE8A;--out:#E8837A;--inv:#9FB4E8;--warn:#E0A54A;--warn-soft:#2E2617;color-scheme:dark;--f-display:"Limelight",Georgia,serif;--f-body:"Josefin Sans",system-ui,sans-serif;--f-num:"Oswald","Arial Narrow",sans-serif;--r:2px;--deco-red:#7A1414;--deco-red2:#8C1C1C}
+[data-paleta="deco"] body::before{background:var(--deco-red)}
+[data-paleta="deco"] header.top{background:var(--deco-red) url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22390%22%20height%3D%2270%22%20viewBox%3D%220%200%20390%2070%22%3E%3Cpath%20d%3D%22M0%2070V40h22V28h12v12h14V18h10V6h6v12h10v52zM80%2070V30h12V14l8-14%208%2014v16h12v40zM126%2070V36h24V20h10v16h12v34zM178%2070V20h8V10h8V2l4-2%204%202v8h8v10h8v50zM224%2070V34h22V22h16v12h8v36zM276%2070V24h10V12l10-12%2010%2012v12h10v46zM322%2070V40h18V28h16v12h12V30h22v40z%22%20fill%3D%22%233E0909%22/%3E%3C/svg%3E") repeat-x left bottom/390px 70px;border-bottom:3px solid var(--accent)}
+[data-paleta="deco"] .brand{letter-spacing:.18em;text-transform:uppercase;font-weight:400;color:#F3E6CC}
+[data-paleta="deco"] .mep{color:#F0D6A0}
+[data-paleta="deco"] header .seg{background:rgb(0 0 0 / .35)}
+[data-paleta="deco"] header .seg button{color:#F0D6A0}
+[data-paleta="deco"] header .seg button[aria-pressed="true"]{background:var(--accent);color:#0B0A0A;box-shadow:none}
+[data-paleta="deco"] nav.tabs button{color:#E9C9BE;text-transform:uppercase;letter-spacing:.14em;font-size:.78rem;font-weight:600}
+[data-paleta="deco"] nav.tabs button[aria-current="true"]{color:#F3E6CC;border-bottom:3px solid var(--accent)}
+[data-paleta="deco"] h1,[data-paleta="deco"] h2,[data-paleta="deco"] h3{font-weight:400;letter-spacing:.06em}
+[data-paleta="deco"] .num,[data-paleta="deco"] .kpi .val{letter-spacing:.02em;font-variant-numeric:tabular-nums}
+[data-paleta="deco"] .kpi{border-top:3px solid var(--deco-red2);position:relative}
+[data-paleta="deco"] .kpi .lab,[data-paleta="deco"] th{letter-spacing:.2em}
+[data-paleta="deco"] .card,[data-paleta="deco"] .acct{position:relative}
+[data-paleta="deco"] .card::before{content:"";position:absolute;top:-1px;left:-1px;width:18px;height:18px;border-top:2px solid var(--accent);border-left:2px solid var(--accent);pointer-events:none}
+[data-paleta="deco"] .card::after{content:"";position:absolute;bottom:-1px;right:-1px;width:18px;height:18px;border-bottom:2px solid var(--accent);border-right:2px solid var(--accent);pointer-events:none}
+[data-paleta="deco"] .btn{text-transform:uppercase;letter-spacing:.12em;font-size:.82rem;font-weight:600}
+[data-paleta="deco"] .btn.pri,[data-paleta="deco"] .fab{background:var(--deco-red2);border-color:var(--accent);color:#F3E6CC}
+[data-paleta="deco"] .fab{border-radius:2px;border:1px solid var(--accent);text-transform:uppercase;letter-spacing:.14em}
+[data-paleta="deco"] .pill{border-radius:2px;text-transform:uppercase;letter-spacing:.1em;font-size:.76rem}
+[data-paleta="deco"] .pill[aria-pressed="true"]{background:var(--accent);color:#0B0A0A;border-color:var(--accent)}
+[data-paleta="deco"] .seg,[data-paleta="deco"] .seg button,[data-paleta="deco"] .tag,[data-paleta="deco"] .progress,[data-paleta="deco"] .progress>div,[data-paleta="deco"] .barrow .track,[data-paleta="deco"] .barrow .fill,[data-paleta="deco"] .sheet{border-radius:2px}
+[data-paleta="deco"] .sheet{border-top:3px solid var(--accent)}
+[data-paleta="deco"] .toast{background:var(--deco-red2);color:#F3E6CC;border:1px solid var(--accent);border-radius:2px}
+[data-paleta="deco"] .tema[data-v="deco"] b{font-family:"Limelight",serif;font-weight:400;letter-spacing:.06em}
 @media (max-width:560px){
   .barrow{grid-template-columns:minmax(90px,120px) 1fr auto}
   .kpi .val{font-size:1.25rem}
@@ -272,7 +306,7 @@ const TIPO_CTA = {banco:"Banco",billetera:"Billetera",efectivo:"Efectivo",broker
 const FONDO="fondo_depto";
 
 /* ---------- Temas ---------- */
-const TEMAS={"bosque": {"n": "Bosque", "d": "Verde y petróleo, sobrio", "claro": {"bg": "#F3F5F1", "surface": "#FFFFFF", "sunk": "#E9EDE7", "ink": "#15201A", "muted": "#5D6A62", "line": "#D9DFD8", "accent": "#1D5866", "accent-soft": "#DAE9EC", "on-accent": "#FFFFFF", "in": "#1F7F4F", "out": "#B44A2F", "inv": "#3B57A6", "warn": "#9A5F0E", "warn-soft": "#F4EBDD"}, "oscuro": {"bg": "#0E1411", "surface": "#151D19", "sunk": "#1B2520", "ink": "#E5ECE7", "muted": "#93A198", "line": "#27332D", "accent": "#6FC3CF", "accent-soft": "#183A40", "on-accent": "#0B1410", "in": "#62C98F", "out": "#E5826A", "inv": "#8EA6F2", "warn": "#E0A54A", "warn-soft": "#2E2617"}}, "oceano": {"n": "Océano", "d": "Azul marino y celeste", "claro": {"bg": "#F2F5F8", "surface": "#FFFFFF", "sunk": "#E6ECF2", "ink": "#132030", "muted": "#55667A", "line": "#D5DEE8", "accent": "#1C5A9E", "accent-soft": "#DCE8F6", "on-accent": "#FFFFFF", "in": "#1C7D55", "out": "#B8452F", "inv": "#7A4FB5", "warn": "#9A5F0E", "warn-soft": "#F4EBDD"}, "oscuro": {"bg": "#0D131B", "surface": "#141C27", "sunk": "#1A2431", "ink": "#E3EAF2", "muted": "#93A3B6", "line": "#263243", "accent": "#6FA8EE", "accent-soft": "#1B2C42", "on-accent": "#0B1220", "in": "#5CC596", "out": "#EC8670", "inv": "#B999F2", "warn": "#E0A54A", "warn-soft": "#2E2617"}}, "ciruela": {"n": "Ciruela", "d": "Violeta elegante", "claro": {"bg": "#F6F3F7", "surface": "#FFFFFF", "sunk": "#ECE6EE", "ink": "#21172A", "muted": "#6A5E72", "line": "#E0D8E4", "accent": "#6B3FA0", "accent-soft": "#ECE3F6", "on-accent": "#FFFFFF", "in": "#1E7A52", "out": "#B5432F", "inv": "#2F6DB0", "warn": "#9A5F0E", "warn-soft": "#F4EBDD"}, "oscuro": {"bg": "#140F18", "surface": "#1C1521", "sunk": "#241C2A", "ink": "#ECE4F0", "muted": "#A698AE", "line": "#32283A", "accent": "#B794F0", "accent-soft": "#2E2140", "on-accent": "#160E20", "in": "#5FC394", "out": "#EA8269", "inv": "#7FB0F0", "warn": "#E0A54A", "warn-soft": "#2E2617"}}, "arena": {"n": "Arena", "d": "Cálido, tonos tierra", "claro": {"bg": "#F7F3EE", "surface": "#FFFDFA", "sunk": "#EFE8E0", "ink": "#2A1D16", "muted": "#73645A", "line": "#E4DAD0", "accent": "#5B3E2B", "accent-soft": "#EEE3D8", "on-accent": "#FFFFFF", "in": "#2C7A4B", "out": "#B3363F", "inv": "#3557A8", "warn": "#9A5F0E", "warn-soft": "#F4EBDD"}, "oscuro": {"bg": "#16110D", "surface": "#1E1813", "sunk": "#271F19", "ink": "#EEE5DC", "muted": "#A9998C", "line": "#362B23", "accent": "#D8B48F", "accent-soft": "#3A2C20", "on-accent": "#1A120C", "in": "#69C38F", "out": "#EE7F86", "inv": "#8FA9F0", "warn": "#E0A54A", "warn-soft": "#2E2617"}}, "grafito": {"n": "Grafito", "d": "Neutro, alto contraste", "claro": {"bg": "#F4F4F5", "surface": "#FFFFFF", "sunk": "#E9E9EB", "ink": "#18181B", "muted": "#5F5F68", "line": "#DCDCE0", "accent": "#27272A", "accent-soft": "#E4E4E7", "on-accent": "#FFFFFF", "in": "#1E7A52", "out": "#B44A2F", "inv": "#3B57A6", "warn": "#9A5F0E", "warn-soft": "#F4EBDD"}, "oscuro": {"bg": "#0F0F11", "surface": "#18181B", "sunk": "#202024", "ink": "#EDEDEF", "muted": "#A0A0A9", "line": "#2C2C31", "accent": "#E4E4E7", "accent-soft": "#2A2A2F", "on-accent": "#18181B", "in": "#5FC394", "out": "#E5826A", "inv": "#8EA6F2", "warn": "#E0A54A", "warn-soft": "#2E2617"}}};
+const TEMAS={"deco": {"n": "Dark Deco", "d": "Noir art déco: negro, rojo y dorado", "claro": {"bg": "#0B0A0A", "surface": "#151211", "sunk": "#1E1A18", "ink": "#EDE3CF", "muted": "#A99F8E", "line": "#3A3430", "accent": "#C9A24A", "accent-soft": "#2B2112", "on-accent": "#0B0A0A", "in": "#7DBE8A", "out": "#E8837A", "inv": "#9FB4E8", "warn": "#E0A54A", "warn-soft": "#2E2617"}, "oscuro": {"bg": "#0B0A0A", "surface": "#151211", "sunk": "#1E1A18", "ink": "#EDE3CF", "muted": "#A99F8E", "line": "#3A3430", "accent": "#C9A24A", "accent-soft": "#2B2112", "on-accent": "#0B0A0A", "in": "#7DBE8A", "out": "#E8837A", "inv": "#9FB4E8", "warn": "#E0A54A", "warn-soft": "#2E2617"}}, "bosque": {"n": "Bosque", "d": "Verde y petróleo, sobrio", "claro": {"bg": "#F3F5F1", "surface": "#FFFFFF", "sunk": "#E9EDE7", "ink": "#15201A", "muted": "#5D6A62", "line": "#D9DFD8", "accent": "#1D5866", "accent-soft": "#DAE9EC", "on-accent": "#FFFFFF", "in": "#1F7F4F", "out": "#B44A2F", "inv": "#3B57A6", "warn": "#9A5F0E", "warn-soft": "#F4EBDD"}, "oscuro": {"bg": "#0E1411", "surface": "#151D19", "sunk": "#1B2520", "ink": "#E5ECE7", "muted": "#93A198", "line": "#27332D", "accent": "#6FC3CF", "accent-soft": "#183A40", "on-accent": "#0B1410", "in": "#62C98F", "out": "#E5826A", "inv": "#8EA6F2", "warn": "#E0A54A", "warn-soft": "#2E2617"}}, "oceano": {"n": "Océano", "d": "Azul marino y celeste", "claro": {"bg": "#F2F5F8", "surface": "#FFFFFF", "sunk": "#E6ECF2", "ink": "#132030", "muted": "#55667A", "line": "#D5DEE8", "accent": "#1C5A9E", "accent-soft": "#DCE8F6", "on-accent": "#FFFFFF", "in": "#1C7D55", "out": "#B8452F", "inv": "#7A4FB5", "warn": "#9A5F0E", "warn-soft": "#F4EBDD"}, "oscuro": {"bg": "#0D131B", "surface": "#141C27", "sunk": "#1A2431", "ink": "#E3EAF2", "muted": "#93A3B6", "line": "#263243", "accent": "#6FA8EE", "accent-soft": "#1B2C42", "on-accent": "#0B1220", "in": "#5CC596", "out": "#EC8670", "inv": "#B999F2", "warn": "#E0A54A", "warn-soft": "#2E2617"}}, "ciruela": {"n": "Ciruela", "d": "Violeta elegante", "claro": {"bg": "#F6F3F7", "surface": "#FFFFFF", "sunk": "#ECE6EE", "ink": "#21172A", "muted": "#6A5E72", "line": "#E0D8E4", "accent": "#6B3FA0", "accent-soft": "#ECE3F6", "on-accent": "#FFFFFF", "in": "#1E7A52", "out": "#B5432F", "inv": "#2F6DB0", "warn": "#9A5F0E", "warn-soft": "#F4EBDD"}, "oscuro": {"bg": "#140F18", "surface": "#1C1521", "sunk": "#241C2A", "ink": "#ECE4F0", "muted": "#A698AE", "line": "#32283A", "accent": "#B794F0", "accent-soft": "#2E2140", "on-accent": "#160E20", "in": "#5FC394", "out": "#EA8269", "inv": "#7FB0F0", "warn": "#E0A54A", "warn-soft": "#2E2617"}}, "arena": {"n": "Arena", "d": "Cálido, tonos tierra", "claro": {"bg": "#F7F3EE", "surface": "#FFFDFA", "sunk": "#EFE8E0", "ink": "#2A1D16", "muted": "#73645A", "line": "#E4DAD0", "accent": "#5B3E2B", "accent-soft": "#EEE3D8", "on-accent": "#FFFFFF", "in": "#2C7A4B", "out": "#B3363F", "inv": "#3557A8", "warn": "#9A5F0E", "warn-soft": "#F4EBDD"}, "oscuro": {"bg": "#16110D", "surface": "#1E1813", "sunk": "#271F19", "ink": "#EEE5DC", "muted": "#A9998C", "line": "#362B23", "accent": "#D8B48F", "accent-soft": "#3A2C20", "on-accent": "#1A120C", "in": "#69C38F", "out": "#EE7F86", "inv": "#8FA9F0", "warn": "#E0A54A", "warn-soft": "#2E2617"}}, "grafito": {"n": "Grafito", "d": "Neutro, alto contraste", "claro": {"bg": "#F4F4F5", "surface": "#FFFFFF", "sunk": "#E9E9EB", "ink": "#18181B", "muted": "#5F5F68", "line": "#DCDCE0", "accent": "#27272A", "accent-soft": "#E4E4E7", "on-accent": "#FFFFFF", "in": "#1E7A52", "out": "#B44A2F", "inv": "#3B57A6", "warn": "#9A5F0E", "warn-soft": "#F4EBDD"}, "oscuro": {"bg": "#0F0F11", "surface": "#18181B", "sunk": "#202024", "ink": "#EDEDEF", "muted": "#A0A0A9", "line": "#2C2C31", "accent": "#E4E4E7", "accent-soft": "#2A2A2F", "on-accent": "#18181B", "in": "#5FC394", "out": "#E5826A", "inv": "#8EA6F2", "warn": "#E0A54A", "warn-soft": "#2E2617"}}};
 function aplicarTema(t){ const r=document.documentElement; const pal=TEMAS[t&&t.paleta]?t.paleta:"bosque"; const modo=["claro","oscuro"].includes(t&&t.modo)?t.modo:"auto";
   r.setAttribute("data-paleta",pal); if(modo==="auto") r.removeAttribute("data-modo"); else r.setAttribute("data-modo",modo);
   try{ localStorage.setItem("fin_tema",JSON.stringify({paleta:pal,modo})); }catch(e){} }
@@ -1116,7 +1150,7 @@ function vAjustes(){
   const y=S.year; const nYear=items(y).length;
   const ta=temaActual(), me=modoEfectivo();
   const apariencia=`<section class="card"><div class="sec-h"><h2>Apariencia</h2><p>Se guarda en tu cuenta y se aplica en la compu y el celu</p></div>
-    <div class="row" style="margin-bottom:14px"><span class="muted" style="font-size:.88rem">Modo</span><div class="seg" role="group" aria-label="Modo">${[["auto","Automático"],["claro","Claro"],["oscuro","Oscuro"]].map(([k,v])=>`<button type="button" data-act="modo" data-v="${k}" aria-pressed="${ta.modo===k}">${v}</button>`).join("")}</div></div>
+    ${ta.paleta==="deco"?`<p class="muted" style="font-size:.85rem;margin:0 0 14px">Dark Deco es siempre oscuro.</p>`:""}<div class="row" style="margin-bottom:14px" ${ta.paleta==="deco"?"hidden":""}><span class="muted" style="font-size:.88rem">Modo</span><div class="seg" role="group" aria-label="Modo">${[["auto","Automático"],["claro","Claro"],["oscuro","Oscuro"]].map(([k,v])=>`<button type="button" data-act="modo" data-v="${k}" aria-pressed="${ta.modo===k}">${v}</button>`).join("")}</div></div>
     <div class="temas">${Object.entries(TEMAS).map(([k,t])=>{ const c=t[me]; return `<button type="button" class="tema" data-act="tema" data-v="${k}" aria-pressed="${ta.paleta===k}" style="background:${c.bg};color:${c.ink};border-color:${ta.paleta===k?c.accent:c.line}">
       <span class="tema-top"><b style="font-family:var(--f-display)">${esc(t.n)}</b>${ta.paleta===k?`<span style="font-size:.75rem;color:${c.accent}">En uso</span>`:""}</span>
       <span style="font-size:.8rem;color:${c.muted}">${esc(t.d)}</span>
@@ -1395,6 +1429,14 @@ function parseLocal(txt, c){
 
 /* ---------- Arranque (Supabase) ---------- */
 let USER_MAIL="", SB=null, RT=null;
+
+// El widget del celu toma el color principal del tema (su versión oscura, porque la barra es translúcida oscura)
+let widgetAcc=null;
+function widgetSync(){ try{ const pal=document.documentElement.getAttribute("data-paleta")||"bosque"; const t=TEMAS[pal]||TEMAS.bosque; const acc=t.oscuro.accent;
+  if(acc!==widgetAcc&&window.NATIVO&&NATIVO.widgetTema){ widgetAcc=acc; NATIVO.widgetTema(acc); } }catch(e){} }
+const _aplicarTema=aplicarTema;
+aplicarTema=function(t){ _aplicarTema(t); widgetSync(); };
+widgetSync();
 
 // Misma interfaz de documentos que usaba la web en claude.ai, guardada en la tabla public.docs
 function makeDb(uid){

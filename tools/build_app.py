@@ -52,6 +52,12 @@ s = s[:i] + '</script>\n</body>\n</html>\n'
 
 # ---- estilos base que antes ponía el visor de claude.ai
 R('''*{box-sizing:border-box}''', '''*{box-sizing:border-box}
+@font-face{font-family:"Limelight";font-weight:400;font-display:swap;src:url(fonts/limelight-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:"Josefin Sans";font-weight:400;font-display:swap;src:url(fonts/josefin-sans-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:"Josefin Sans";font-weight:600;font-display:swap;src:url(fonts/josefin-sans-latin-600-normal.woff2) format("woff2")}
+@font-face{font-family:"Josefin Sans";font-weight:700;font-display:swap;src:url(fonts/josefin-sans-latin-700-normal.woff2) format("woff2")}
+@font-face{font-family:"Oswald";font-weight:400;font-display:swap;src:url(fonts/oswald-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:"Oswald";font-weight:500;font-display:swap;src:url(fonts/oswald-latin-500-normal.woff2) format("woff2")}
 html{color-scheme:light}
 :root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 body{margin:0;font-size:14px;font-family:var(--f-body)}

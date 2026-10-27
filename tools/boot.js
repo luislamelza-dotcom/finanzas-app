@@ -1,6 +1,14 @@
 /* ---------- Arranque (Supabase) ---------- */
 let USER_MAIL="", SB=null, RT=null;
 
+// El widget del celu toma el color principal del tema (su versión oscura, porque la barra es translúcida oscura)
+let widgetAcc=null;
+function widgetSync(){ try{ const pal=document.documentElement.getAttribute("data-paleta")||"bosque"; const t=TEMAS[pal]||TEMAS.bosque; const acc=t.oscuro.accent;
+  if(acc!==widgetAcc&&window.NATIVO&&NATIVO.widgetTema){ widgetAcc=acc; NATIVO.widgetTema(acc); } }catch(e){} }
+const _aplicarTema=aplicarTema;
+aplicarTema=function(t){ _aplicarTema(t); widgetSync(); };
+widgetSync();
+
 // Misma interfaz de documentos que usaba la web en claude.ai, guardada en la tabla public.docs
 function makeDb(uid){
   const cache={}, loading={}, listeners=[];

@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="w_voz">🎤  Dictar movimiento</string>
+    <string name="w_voz">Dictar movimiento</string>
+    <string name="w_hint">Dictá un gasto o ingreso…</string>
     <string name="w_nuevo">Cargar movimiento escribiendo</string>
     <string name="w_abrir">Abrir Finanzas</string>
     <string name="w_desc">Cargá un gasto o ingreso hablando, sin abrir la app</string>
