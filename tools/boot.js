@@ -74,6 +74,8 @@ async function iniciarApp(session){
   db.collection("resumenes").onSnapshot(snap=>{ const m={}; snap.docs.forEach(d=>{ const v=d.data(); if(v&&Array.isArray(v.lineas)) m[d.id]=v; }); S.resumenes=m; render(); }, onErr);
   db.doc("config/drive").onSnapshot(d=>{ S.driveCfg=d.exists?d.data():{procesados:{}}; render(); }, onErr);
   db.doc("config/cartera").onSnapshot(d=>{ S.cartera=d.exists?d.data():{items:[],snaps:{}}; render(); }, onErr);
+  db.doc("config/pagos").onSnapshot(d=>{ S.pagosCfg=d.exists?d.data():null; render(); }, onErr);
+  db.collection("facturas").onSnapshot(snap=>{ const m={}; snap.docs.forEach(d=>{ m[d.id]=d.data(); }); S.facturas=m; render(); }, onErr);
 }
 
 
