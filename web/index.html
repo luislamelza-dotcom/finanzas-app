@@ -912,12 +912,17 @@ async function procesarFactura(file){
     else throw new Error("Subí un PDF o una foto de la factura.");
     const c=cfg();
     const prompt=`Leé esta factura de un servicio argentino (luz, gas, agua, internet, celular, expensas, impuestos, seguros, etc.) para una app personal de finanzas.
-Devolvé SOLO un objeto JSON: {"empresa":"Edelap","servicio":"Luz","monto":45230.5,"vencimiento":"YYYY-MM-DD","vencimiento2":"YYYY-MM-DD"|null,"periodo":"10/2026"|null,"cat":"Hogar","sub":"Luz"}
-- monto: el total a pagar al primer vencimiento, número sin separador de miles y con punto decimal.
-- vencimiento: el primer vencimiento. vencimiento2: el segundo si lo hay.
+Respondé SOLO con un objeto JSON válido, sin texto antes ni después, sin comentarios y sin bloques de código. Ejemplo de la forma exacta:
+{"empresa":"Camuzzi","servicio":"Gas","monto":45230.5,"vencimiento":"2026-11-21","vencimiento2":null,"periodo":"06/2026","cat":"Hogar","sub":"Gas"}
+- monto: el TOTAL A PAGAR de la factura, como número sin separador de miles y con punto decimal (por ejemplo 38266.19).
+- vencimiento: el primer vencimiento, en formato YYYY-MM-DD. vencimiento2: el segundo vencimiento o la fecha límite de pago si figura, también YYYY-MM-DD; si no hay, null.
+- periodo: el período facturado como texto, o null.
 - cat y sub: elegí EXACTAMENTE de esta lista (categoría → subcategorías): ${JSON.stringify(c.cats.gasto)}
 ${text?`Texto de la factura:\n<<<\n${text.slice(0,40000)}\n>>>`:"La factura está en las imágenes adjuntas."}`;
-    const res=await sample.json(prompt,{modelTier:"quick",...(images.length?{images}:{})});
+    let res; try{ res=await sample.json(prompt,{modelTier:"quick",...(images.length?{images}:{})}); }
+    catch(e){ if(!e||e.code!=="invalid_json") throw e; res=await sample.json(prompt,{modelTier:"default",...(images.length?{images}:{})}); } // si el modelo rápido no devolvió JSON, reintenta con el más preciso
+    if(res&&typeof res.monto==="string"){ const n=parseNum(res.monto); res.monto=isNaN(n)?null:n; }
+    if(res&&res.vencimiento&&!/^\d{4}-\d{2}-\d{2}$/.test(res.vencimiento)){ const m=String(res.vencimiento).match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/); res.vencimiento=m?m[3]+"-"+m[2].padStart(2,"0")+"-"+m[1].padStart(2,"0"):null; }
     if(!res||!res.vencimiento) throw new Error("No encontré el vencimiento en ese archivo. ¿Es una factura?");
     const tree=c.cats.gasto; let cat=tree[res.cat]?res.cat:"Hogar"; let sub=(tree[cat]||[]).includes(res.sub)?res.sub:((tree[cat]||[])[0]||"");
     S.fac={estado:"revision",archivo:file.name,empresa:res.empresa||"",servicio:res.servicio||"",monto:typeof res.monto==="number"?res.monto:null,vence:res.vencimiento,vence2:res.vencimiento2||null,periodo:res.periodo||"",cat,sub};
@@ -1808,6 +1813,8 @@ function crearSample(){
     const m=t.match(/```(?:json)?\s*([\s\S]*?)```/); if(m) try{ return JSON.parse(m[1]); }catch(e){}
     const ii=[t.indexOf("{"),t.indexOf("[")].filter(x=>x>=0); const i=ii.length?Math.min(...ii):-1, k=Math.max(t.lastIndexOf("}"),t.lastIndexOf("]"));
     if(i>=0&&k>i) try{ return JSON.parse(t.slice(i,k+1)); }catch(e){}
+    // Último intento: saca comentarios y comas sobrantes, que a veces agrega el modelo
+    if(i>=0&&k>i) try{ return JSON.parse(t.slice(i,k+1).replace(/\/\/[^\n"]*$/gm,"").replace(/,\s*([}\]])/g,"$1").replace(/"\s*\|\s*null/g,'"')); }catch(e){}
     throw {code:"invalid_json",message:"La respuesta no era JSON",text:t}; };
   f.limits=async()=>({maxPromptBytes:262144,images:{maxCount:5,maxInputBytes:5e6,mediaTypes:["image/jpeg","image/png","image/webp"]}});
   return f;

@@ -172,6 +172,8 @@ function crearSample(){
     const m=t.match(/```(?:json)?\s*([\s\S]*?)```/); if(m) try{ return JSON.parse(m[1]); }catch(e){}
     const ii=[t.indexOf("{"),t.indexOf("[")].filter(x=>x>=0); const i=ii.length?Math.min(...ii):-1, k=Math.max(t.lastIndexOf("}"),t.lastIndexOf("]"));
     if(i>=0&&k>i) try{ return JSON.parse(t.slice(i,k+1)); }catch(e){}
+    // Último intento: saca comentarios y comas sobrantes, que a veces agrega el modelo
+    if(i>=0&&k>i) try{ return JSON.parse(t.slice(i,k+1).replace(/\/\/[^\n"]*$/gm,"").replace(/,\s*([}\]])/g,"$1").replace(/"\s*\|\s*null/g,'"')); }catch(e){}
     throw {code:"invalid_json",message:"La respuesta no era JSON",text:t}; };
   f.limits=async()=>({maxPromptBytes:262144,images:{maxCount:5,maxInputBytes:5e6,mediaTypes:["image/jpeg","image/png","image/webp"]}});
   return f;
