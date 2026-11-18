@@ -15,7 +15,7 @@ jobs:
       - uses: actions/setup-node@v5
         with: { node-version: 22 }
       - uses: actions/setup-java@v5
-        with: { distribution: temurin, java-version: 17 }
+        with: { distribution: temurin, java-version: 17, cache: gradle }
       - name: Revisar la firma
         env: { KS_PASS: "${{ secrets.ANDROID_KEYSTORE_PASS }}" }
         run: |
@@ -29,8 +29,14 @@ jobs:
         run: |
           cd android && chmod +x gradlew
           set +e
-          ./gradlew assembleRelease --no-daemon 2>&1 | tee ../build.log
-          status=${PIPESTATUS[0]}
+          # Maven Central a veces limita las descargas (error 429): reintenta hasta 3 veces
+          for intento in 1 2 3; do
+            ./gradlew assembleRelease --no-daemon 2>&1 | tee ../build.log
+            status=${PIPESTATUS[0]}
+            [ $status -eq 0 ] && break
+            grep -qE "status code 429|Could not (resolve|find|GET)" ../build.log || break
+            echo "Descarga limitada, reintento en 60 s ($intento/3)"; sleep 60
+          done
           if [ $status -ne 0 ]; then
             msg=$(grep -E "error:|What went wrong|FAILURE|\.java:[0-9]+|\.xml:[0-9]+|Exception" -A4 ../build.log | head -60 | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
             echo "::error title=Falló la compilación::$msg"
