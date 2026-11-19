@@ -225,6 +225,8 @@ html:root[data-paleta="deco"][data-paleta]{--bg:#0B0A0A;--surface:#151211;--sunk
 .sem-msg{color:var(--sem)}
 .sem-sub{font-size:.84rem;color:var(--muted)}
 @media (max-width:560px){.list-plain.venc li{grid-template-columns:44px minmax(0,1fr) auto}.list-plain.venc li>.tag{grid-column:2;justify-self:start}.list-plain.venc li>.row{grid-column:3}.sem-val{font-size:1.8rem}}
+.list-plain.venc.conc li{grid-template-columns:48px minmax(0,1fr) auto auto}
+@media (max-width:560px){.list-plain.venc.conc li{grid-template-columns:44px minmax(0,1fr) auto}.list-plain.venc.conc li>.row,.list-plain.venc.conc li>.btn{grid-column:2/-1;justify-self:end}.list-plain.venc.conc li>.tag{grid-column:auto}}
 @media (max-width:560px){
   .barrow{grid-template-columns:minmax(90px,120px) 1fr auto}
   .kpi .val{font-size:1.25rem}
@@ -267,6 +269,7 @@ html:root[data-paleta="deco"][data-paleta]{--bg:#0B0A0A;--surface:#151211;--sunk
       <button data-tab="resumen">Resumen</button>
       <button data-tab="movs">Movimientos</button>
       <button data-tab="pagos">Pagos</button>
+      <button data-tab="conc">Conciliación</button>
       <button data-tab="cuentas">Cuentas</button>
       <button data-tab="inv">Inversiones</button>
       <button data-tab="tarjeta">Resumen de tarjeta</button>
@@ -455,7 +458,7 @@ function doRender(){
   if(!S.loaded.meses && !offline){ return; }
   let h="";
   if(offline) h+=`<div class="banner">No hay conexión con la base de datos en esta vista. Podés mirar, pero los cambios no se guardan.</div>`;
-  h += ({resumen:vResumen,movs:vMovs,pagos:vPagos,cuentas:vCuentas,inv:vInv,tarjeta:vTarjeta,depto:vDepto,ajustes:vAjustes}[S.tab]||vResumen)();
+  h += ({resumen:vResumen,movs:vMovs,pagos:vPagos,conc:vConc,cuentas:vCuentas,inv:vInv,tarjeta:vTarjeta,depto:vDepto,ajustes:vAjustes}[S.tab]||vResumen)();
   const keepScroll=window.scrollY;
   const keep=[], act=document.activeElement;
   main.querySelectorAll("[data-dirty]").forEach(e=>{ const k=e.id?"#"+e.id:e.dataset.ini?`[data-ini="${e.dataset.ini}"]`:e.dataset.inif?`[data-inif="${e.dataset.inif}"]`:null; if(k) keep.push([k,e.value,e===act,e.selectionStart]); });
@@ -639,6 +642,7 @@ async function submitForm(){
   if(F.t==="v"||F.t==="r"||F.t==="x"){ it.cta2=F.cta2; const dm=cuentaMon(F.cta2); if(dm!==F.mon){ it.mon2=dm; it.m2 = F.m2!=null?F.m2 : (dm==="USD"? F.m/(it.tc||1) : F.m*(mepActual()||1)); } }
   if(F.rid) it.rid=F.rid;
   if(F.pago) it.pago=F.pago;
+  if(F.conc) it.conc=F.conc;
   if(F.t==="h"&&F.cat==="Cuota") it.n=F.n||proxCuota();
   if((F.t==="h"||(F.t==="x"&&F.cta2===FONDO))&&F.mon==="ARS"){ if(F.uva) it.uva=F.uva; else if(!(F.t==="h"&&F.cat==="Cuota")&&uvaHoy()) it.uva=uvaHoy(); }
   const touched=new Set();
@@ -974,6 +978,125 @@ function semaforo(){
     <span class="sem-sub">Hasta el ${dMes}/${ym.slice(5)} necesitás ≈ ${ars(necesita)}: ${ars(pend)} en ${vs.length} vencimiento${vs.length===1?"":"s"} sin pagar (<a href="#" data-act="tab" data-tab="pagos">ver</a>) + ${ars(esperado)} del día a día (≈ ${ars(porDia)} por día, según ${base}).</span>
   </section>`;
 }
+
+/* ---------- Conciliación bancaria ---------- */
+// Cuánto mueve un movimiento de la app en una cuenta (en pesos, con signo), o null si no la toca
+function efectoEn(it,cta){
+  if(it.t==="g") return it.cta===cta&&it.mon==="ARS"? -it.m : null;
+  if(it.t==="i") return it.cta===cta&&it.mon==="ARS"? it.m : null;
+  if(it.cta===cta&&it.mon==="ARS") return -it.m;
+  if(it.cta2===cta&&(it.mon2||it.mon)==="ARS") return it.m2!=null?it.m2:it.m;
+  return null;
+}
+function concCtas(){ return cuentas(false).filter(k=>k.mon==="ARS"&&["banco","billetera"].includes(k.tipo)); }
+function concDoc(){ const cta=S.concCta||"nacion", ym=S.concMes||todayISO().slice(0,7); return (S.concs||{})[cta+"_"+ym]||null; }
+function sumarDias(f,n){ const d=new Date(f+"T12:00:00"); d.setDate(d.getDate()+n); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+// Cruza las líneas del extracto con lo cargado: mismo monto (±0,5% o $1) y fecha a 4 días o menos
+function conciliar(doc){
+  const cta=doc.cta, desde=doc.desde||doc.ym+"-01", hasta=doc.hasta||fechaDia(doc.ym,31);
+  const app=items("").filter(it=>{ const f=String(it.f); return f.length===10&&f>=sumarDias(desde,-4)&&f<=sumarDias(hasta,4); }).map(it=>({it,e:efectoEn(it,cta)})).filter(x=>x.e!=null);
+  const usados=new Set(), par={};
+  const lineas=(doc.lineas||[]).filter(l=>!(doc.ignorados||{})[l.k]);
+  for(const l of lineas){ const x=app.find(a=>!usados.has(a.it.id)&&a.it.conc===l.k); if(x){ usados.add(x.it.id); par[l.k]=x.it; } }
+  for(const l of [...lineas].sort((a,b)=>Math.abs(b.m)-Math.abs(a.m))){ if(par[l.k]) continue;
+    const tol=Math.max(1,Math.abs(l.m)*0.005); let mejor=null, dist=99;
+    for(const a of app){ if(usados.has(a.it.id)||Math.abs(a.e-l.m)>tol) continue; const dd=Math.abs((new Date(a.it.f+"T12:00:00")-new Date(l.f+"T12:00:00"))/864e5); if(dd<=4&&dd<dist){ mejor=a; dist=dd; } }
+    if(mejor){ usados.add(mejor.it.id); par[l.k]=mejor.it; } }
+  const enApp=app.filter(a=>!usados.has(a.it.id)&&a.it.f>=desde&&a.it.f<=hasta).map(a=>({it:a.it,e:a.e})).sort((a,b)=>a.it.f.localeCompare(b.it.f));
+  // Saldo de la app al último día del extracto
+  const k=cfg().cuentas.find(c=>c.id===cta); let saldoApp=null;
+  if(k&&k.ini&&k.ini.f<=hasta){ saldoApp=k.ini.m; for(const it of items("")){ const f=String(it.f).padEnd(10,"-"); if(f<k.ini.f||f>hasta) continue; const e=efectoEn(it,cta); if(e!=null) saldoApp+=e; } }
+  return {par,coinciden:lineas.filter(l=>par[l.k]),faltan:lineas.filter(l=>!par[l.k]),enApp,saldoApp,desde,hasta};
+}
+function lineaAItem(l,cta,doc){
+  const tree=cfg().cats; const base={id:uid(),f:l.f,m:Math.abs(l.m),mon:"ARS",d:l.d||"",src:"conciliacion",conc:l.k,tc:tcMes(ymOf(l.f))||null};
+  if((l.tipo==="x"||l.tipo==="v")&&l.otra&&l.otra!==cta) return l.m<0?{...base,t:l.tipo,cta,cta2:l.otra}:{...base,t:l.tipo==="v"?"r":"x",cta:l.otra,cta2:cta};
+  if(l.tipo==="h"&&l.m<0) return {...base,t:"h",cta,cat:"Cuota",sub:""};
+  const t=l.m<0?"g":"i", arbol=t==="i"?tree.ingreso:tree.gasto;
+  let cat=arbol[l.cat]?l.cat:(t==="i"?"Otros ingresos":"Otros"); let sub=(arbol[cat]||[]).includes(l.sub)?l.sub:((arbol[cat]||[])[0]||"");
+  return {...base,t,cta,cat,sub};
+}
+const TIPO_LIN={g:"Gasto",i:"Ingreso",x:"Transferencia",v:"Inversión",h:"Cuota depto"};
+function propuestaTxt(l,cta){ const it=lineaAItem(l,cta); if(it.t==="x"||it.t==="v"||it.t==="r") return TIPOS[it.t]+" "+(it.cta===cta?"→ "+cuentaNombre(it.cta2):"← "+cuentaNombre(it.cta)); if(it.t==="h") return "Cuota del depto"; return it.cat+(it.sub?" › "+it.sub:""); }
+
+function vConc(){
+  const ctas=concCtas(); if(!S.concCta||!ctas.some(k=>k.id===S.concCta)) S.concCta=ctas.some(k=>k.id==="nacion")?"nacion":(ctas[0]||{}).id;
+  const ym=S.concMes||todayISO().slice(0,7), [y,m]=ym.split("-").map(Number), cta=S.concCta;
+  const prev=new Date(y,m-2,1), next=new Date(y,m,1), kk=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");
+  let h=`<section class="row" style="justify-content:space-between"><button class="btn sm" data-act="concmes" data-ym="${kk(prev)}">‹ ${MES[prev.getMonth()]}</button><h2>${MES_L[m-1]} ${y}</h2><button class="btn sm" data-act="concmes" data-ym="${kk(next)}">${MES[next.getMonth()]} ›</button></section>
+  <section class="seg" role="group" aria-label="Cuenta a conciliar">${ctas.map(k=>`<button type="button" data-act="conccta" data-id="${k.id}" aria-pressed="${k.id===cta}">${esc(k.nombre)}</button>`).join("")}</section>`;
+  const doc=concDoc(); const st=S.concEst;
+  if(st&&st.estado==="leyendo") return h+`<section class="card"><p style="margin:0"><span class="spin"></span> Leyendo el extracto ${esc(st.archivo||"")}… puede tardar un minuto si es largo.</p></section>`;
+  if(st&&st.estado==="error") h+=`<div class="banner" style="color:var(--out)">${esc(st.msg)}</div>`;
+  if(!doc||S.concNuevo){
+    h+=`<section class="card"><div class="sec-h"><h2>Subí el extracto de ${esc(cuentaNombre(cta))}</h2><p>El de ${MES_L[m-1].toLowerCase()}: PDF, Excel, CSV o foto. La app lo compara movimiento por movimiento con lo que cargaste.</p></div>
+      ${sample?`<label class="btn pri" for="concFile" style="display:inline-block">Elegir archivo</label><input id="concFile" type="file" accept="application/pdf,.pdf,.xlsx,.xls,.csv,text/csv,image/*" hidden>${doc?` <button class="btn" data-act="concnuevo">Cancelar</button>`:""}`:`<div class="banner">Para leer extractos hace falta la IA.</div>`}
+      <p class="muted" style="font-size:.84rem;margin:12px 0 0">Banco Nación: en Home Banking, Cuentas → Movimientos → elegí las fechas y descargá. Ualá: en la app, Movimientos → Descargar resumen.</p></section>`;
+    return h;
+  }
+  const r=conciliar(doc); const sum=a=>a.reduce((s,l)=>s+l.m,0);
+  const dif=r.saldoApp!=null&&doc.saldo_final!=null? r.saldoApp-doc.saldo_final : null;
+  const ok=!r.faltan.length&&!r.enApp.length&&(dif==null||Math.abs(dif)<1);
+  h+=`<section class="kpis">
+    <div class="kpi"><span class="lab">Coinciden</span><span class="val in">${r.coinciden.length}</span><span class="sub">de ${r.coinciden.length+r.faltan.length} movimientos del extracto</span></div>
+    <div class="kpi"><span class="lab">Faltan en la app</span><span class="val ${r.faltan.length?"out":""}">${r.faltan.length}</span><span class="sub">${r.faltan.length?"netos "+arsS(sum(r.faltan),{sign:true}):"nada para cargar"}</span></div>
+    <div class="kpi"><span class="lab">En la app, no en el banco</span><span class="val ${r.enApp.length?"warn":""}">${r.enApp.length}</span><span class="sub">${r.enApp.length?"revisá si están bien":"todo aparece en el extracto"}</span></div>
+    <div class="kpi"><span class="lab">Saldo al ${fechaTxt(r.hasta)}</span><span class="val">${doc.saldo_final!=null?ars(doc.saldo_final):"—"}</span><span class="sub">${dif==null?(doc.saldo_final==null?"el extracto no trae saldo":"falta el saldo inicial de la cuenta en la app"):Math.abs(dif)<1?"igual que en la app":"la app dice "+ars(r.saldoApp)+" ("+(dif>0?"+":"−")+ars(Math.abs(dif)).slice(2)+")"}</span></div>
+  </section>`;
+  if(ok) h+=`<div class="banner" style="color:var(--in);border-color:var(--in)">Conciliado: todo lo del extracto está en la app y el saldo coincide.</div>`;
+  if(r.faltan.length){
+    const cargables=r.faltan.filter(l=>{ const it=lineaAItem(l,cta); return !((l.tipo==="x"||l.tipo==="v")&&!l.otra); });
+    h+=`<section class="card"><div class="sec-h"><h2>En el extracto, no en la app</h2>${cargables.length?`<button class="btn sm pri" data-act="conctodos">Cargar ${cargables.length===r.faltan.length?"todos":cargables.length+" listos"} (${cargables.length})</button>`:""}</div>
+      <ul class="list-plain venc conc">${r.faltan.map(l=>`<li><span class="venc-f num">${fechaTxt(l.f)}</span><span class="venc-t"><b>${esc(l.d||"—")}</b><span class="muted" style="font-size:.82rem">${esc(propuestaTxt(l,cta))}</span></span><span class="venc-m num ${l.m<0?"out":"in"}">${arsS(l.m,{sign:true})}</span><span class="row" style="gap:6px"><button class="btn sm pri" data-act="concuno" data-k="${esc(l.k)}">Cargar</button><button class="btn sm" data-act="concign" data-k="${esc(l.k)}">Ignorar</button></span></li>`).join("")}</ul>
+      <p class="muted" style="font-size:.82rem;margin:10px 0 0">“Cargar” abre el movimiento armado para que lo revises. “Ignorar” sirve para lo que no querés en la app (por ejemplo, un movimiento que el banco anuló).</p></section>`;
+  }
+  if(r.enApp.length) h+=`<section class="card"><div class="sec-h"><h2>En la app, no en el extracto</h2><p>Puede ser un error de carga, una fecha o monto distinto, o algo que el banco todavía no procesó</p></div>
+    <ul class="list-plain venc conc">${r.enApp.map(a=>`<li><span class="venc-f num">${fechaTxt(a.it.f)}</span><span class="venc-t"><b>${esc(a.it.d||a.it.cat||TIPOS[a.it.t])}</b><span class="muted" style="font-size:.82rem">${esc(TIPOS[a.it.t])}${a.it.cat?" · "+esc(a.it.cat):""}</span></span><span class="venc-m num ${a.e<0?"out":"in"}">${arsS(a.e,{sign:true})}</span><button class="btn sm" data-act="edit" data-id="${a.it.id}">Revisar</button></li>`).join("")}</ul></section>`;
+  if(r.coinciden.length) h+=`<section class="card"><details><summary>Coinciden (${r.coinciden.length})</summary><ul class="list-plain venc conc" style="margin-top:8px">${r.coinciden.map(l=>`<li><span class="venc-f num">${fechaTxt(l.f)}</span><span class="venc-t"><b>${esc(l.d||"—")}</b><span class="muted" style="font-size:.82rem">en la app: ${esc(r.par[l.k].d||r.par[l.k].cat||TIPOS[r.par[l.k].t])} · ${fechaTxt(r.par[l.k].f)}</span></span><span class="venc-m num ${l.m<0?"out":"in"}">${arsS(l.m,{sign:true})}</span><span class="tag" style="background:color-mix(in srgb,var(--in) 16%,transparent);color:var(--in)">OK</span></li>`).join("")}</ul></details></section>`;
+  const ign=Object.keys(doc.ignorados||{}).length;
+  h+=`<section class="row" style="justify-content:space-between"><span class="muted" style="font-size:.84rem">Extracto: ${esc(doc.archivo||"")} · del ${fechaTxt(r.desde)} al ${fechaTxt(r.hasta)}${ign?` · ${ign} ignorados (<a href="#" data-act="concdesign">volver a mostrar</a>)`:""}</span><span class="row" style="gap:8px"><button class="btn sm" data-act="concnuevo">Subir otro extracto</button><button class="btn sm danger" data-act="concborrar">${S.concConf?"¿Borrar?":"Borrar"}</button></span></section>`;
+  return h;
+}
+async function sheetToText(file){
+  if(!window.XLSX) await loadScript("https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js");
+  const wb=XLSX.read(new Uint8Array(await file.arrayBuffer()),{type:"array",cellDates:true});
+  return wb.SheetNames.map(n=>"--- Hoja "+n+" ---\n"+XLSX.utils.sheet_to_csv(wb.Sheets[n],{FS:" | ",blankrows:false,dateNF:"dd/mm/yyyy"})).join("\n");
+}
+async function procesarExtracto(file){
+  const cta=S.concCta, ym=S.concMes||todayISO().slice(0,7);
+  S.concEst={estado:"leyendo",archivo:file.name}; render();
+  try{
+    let text="", images=[]; const lim=await sample.limits().catch(()=>null);
+    if(/pdf$/i.test(file.type)||/\.pdf$/i.test(file.name)){ const r=await pdfToText(file); text=r.text; if(text.replace(/\s|---|Página \d+/g,"").length<150){ if(!lim||!lim.images) throw new Error("El PDF parece escaneado y esta vista no puede mandar imágenes."); images=await pagesToImages(r.pages,5); text=""; } }
+    else if(/\.(xlsx|xls)$/i.test(file.name)||/sheet|excel/i.test(file.type)) text=await sheetToText(file);
+    else if(/\.csv$/i.test(file.name)||/csv|text\/plain/.test(file.type)) text=await file.text();
+    else if(file.type.startsWith("image/")){ if(!lim||!lim.images) throw new Error("Esta vista no puede mandar imágenes. Subí el PDF o el Excel."); images=[await achicarFoto(file)]; }
+    else throw new Error("Subí el extracto en PDF, Excel, CSV o foto.");
+    const c=cfg(); const otras=cuentas(false).filter(k=>k.id!==cta).map(k=>`${k.id} = ${k.nombre}`).join("; ");
+    const prompt=`Este es el extracto o resumen de movimientos de la cuenta "${cuentaNombre(cta)}" de un usuario argentino, para el mes ${MES_L[+ym.slice(5)-1]} ${ym.slice(0,4)}.
+Extraé TODOS los movimientos y respondé SOLO con un objeto JSON válido, sin texto antes ni después y sin bloques de código, con esta forma:
+{"desde":"2026-11-01","hasta":"2026-11-30","saldo_inicial":123456.78,"saldo_final":98765.43,"lineas":[{"f":"2026-11-03","d":"COMPRA DEBITO COTO 112","m":-45230.5,"tipo":"g","cat":"Supermercado","sub":"Súper y almacén","otra":null}]}
+Reglas:
+- m: importe con signo, como número con punto decimal: negativo si salió plata de la cuenta (débito, compra, pago, transferencia enviada, impuesto, comisión), positivo si entró (crédito, sueldo, transferencia recibida, reintegro, intereses).
+- f: fecha del movimiento YYYY-MM-DD. d: la descripción tal como figura, corta.
+- desde/hasta: el período del extracto. saldo_inicial/saldo_final: los saldos que figuren; si no figuran, null.
+- tipo: "g" gasto, "i" ingreso, "x" transferencia entre cuentas propias del usuario o pago del resumen de su tarjeta, "v" envío de plata a su broker de inversiones, "h" cuota de su préstamo hipotecario. Para "x" y "v" poné en "otra" el id de la otra cuenta si se reconoce (si no, null). Cuentas del usuario: ${otras}.
+- cat y sub (solo para "g" e "i"): elegí EXACTAMENTE de estas listas. Gastos: ${JSON.stringify(c.cats.gasto)}. Ingresos: ${JSON.stringify(Object.keys(c.cats.ingreso))} (sub vacío). Impuestos como "Ley 25413", "IIBB" o "Percepción" van a "Bancos y trámites" › "Impuestos y percepciones"; comisiones y mantenimiento a "Comisiones bancarias".
+- No inventes movimientos ni dupliques. No incluyas líneas de saldo ni subtotales.
+${text?`Contenido del extracto:\n<<<\n${text.slice(0,60000)}\n>>>`:"El extracto está en las imágenes adjuntas."}`;
+    const res=await sample.json(prompt,{modelTier:"default",...(images.length?{images}:{})});
+    const ls=Array.isArray(res&&res.lineas)?res.lineas:null; if(!ls||!ls.length) throw new Error("No encontré movimientos en ese archivo. ¿Es el extracto de la cuenta?");
+    const fISO=v=>{ if(!v) return null; if(/^\d{4}-\d{2}-\d{2}$/.test(v)) return v; const m=String(v).match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/); return m?(m[3].length===2?"20"+m[3]:m[3])+"-"+m[2].padStart(2,"0")+"-"+m[1].padStart(2,"0"):null; };
+    const num=v=>v==null?null:typeof v==="number"?v:(n=>isNaN(n)?null:n)(parseNum(v));
+    const lineas=ls.map(l=>({k:uid()+Math.random().toString(36).slice(2,4),f:fISO(l.f),d:String(l.d||"").slice(0,80),m:num(l.m),tipo:["g","i","x","v","h"].includes(l.tipo)?l.tipo:null,cat:l.cat||"",sub:l.sub||"",otra:l.otra&&cuentas(true).some(k=>k.id===l.otra)?l.otra:null})).filter(l=>l.f&&l.m);
+    for(const l of lineas){ if(!l.tipo) l.tipo=l.m<0?"g":"i"; if(l.tipo==="g"&&l.m>0) l.tipo="i"; if(l.tipo==="i"&&l.m<0) l.tipo="g";
+      const rg=S.reglas&&S.reglas[merchantKey(l.d)]; if(rg&&l.tipo==="g"){ l.cat=rg.cat; l.sub=rg.sub; } }
+    const doc={cta,ym,archivo:file.name,cargado:todayISO(),desde:fISO(res.desde)||lineas.reduce((a,l)=>l.f<a?l.f:a,"9999"),hasta:fISO(res.hasta)||lineas.reduce((a,l)=>l.f>a?l.f:a,""),saldo_inicial:num(res.saldo_inicial),saldo_final:num(res.saldo_final),lineas,ignorados:{}};
+    S.concs=Object.assign({},S.concs,{[cta+"_"+ym]:doc}); S.concEst=null; S.concNuevo=false; render();
+    await save("conciliaciones/"+cta+"_"+ym,doc); toast(lineas.length+" movimientos leídos del extracto");
+  }catch(e){ S.concEst={estado:"error",msg:(e&&e.code)?(e.code==="invalid_json"?"No pude interpretar la respuesta de la IA. Probá de nuevo; si sigue, subí el extracto en otro formato.":"Hubo un problema al leer el extracto ("+e.code+"). Probá de nuevo."):(e&&e.message)||"No pude leer el archivo."}; render(); }
+}
+function saveConc(doc){ S.concs=Object.assign({},S.concs,{[doc.cta+"_"+doc.ym]:doc}); render(); return save("conciliaciones/"+doc.cta+"_"+doc.ym,doc); }
 
 /* ---------- Vista: Cuentas ---------- */
 function vCuentas(){
@@ -1368,7 +1491,7 @@ function vAjustes(){
   </section>`;
 }
 
-function respaldoDocs(){ const docs={}; for(const [k,v] of Object.entries(S.meses)) docs["meses/"+k]=v; docs["config/main"]=cfg(); docs["config/reglas"]={map:S.reglas||{}}; docs["config/cartera"]=S.cartera||{items:[],snaps:{}}; if(S.mercado) docs["config/mercado"]=S.mercado; if(S.driveCfg) docs["config/drive"]=S.driveCfg; for(const [k,v] of Object.entries(S.resumenes||{})) docs["resumenes/"+k]=v; if(S.pagosCfg) docs["config/pagos"]=S.pagosCfg; for(const [k,v] of Object.entries(S.facturas||{})) docs["facturas/"+k]=v; return {formato:"finanzas-v1",fecha:todayISO(),docs}; }
+function respaldoDocs(){ const docs={}; for(const [k,v] of Object.entries(S.meses)) docs["meses/"+k]=v; docs["config/main"]=cfg(); docs["config/reglas"]={map:S.reglas||{}}; docs["config/cartera"]=S.cartera||{items:[],snaps:{}}; if(S.mercado) docs["config/mercado"]=S.mercado; if(S.driveCfg) docs["config/drive"]=S.driveCfg; for(const [k,v] of Object.entries(S.resumenes||{})) docs["resumenes/"+k]=v; if(S.pagosCfg) docs["config/pagos"]=S.pagosCfg; for(const [k,v] of Object.entries(S.facturas||{})) docs["facturas/"+k]=v; for(const [k,v] of Object.entries(S.concs||{})) docs["conciliaciones/"+k]=v; return {formato:"finanzas-v1",fecha:todayISO(),docs}; }
 
 /* ---------- Arranque de cero ---------- */
 function inicioSug(){ const d=new Date(); const n=new Date(d.getFullYear(),d.getMonth()+1,1); return n.getFullYear()+"-"+String(n.getMonth()+1).padStart(2,"0")+"-01"; }
@@ -1434,6 +1557,16 @@ document.addEventListener("click", async ev=>{
     case "delmov": { if(!F._orig) return; if(el.dataset.sure!=="1"){ el.dataset.sure="1"; el.textContent="Tocá de nuevo para borrar"; return; } const k=removeItem(F._orig); closeForm(); render(); if(k) await saveMes(k); toast("Movimiento borrado"); break; }
     case "ini": iniSheet(el.dataset.id); break;
     case "igualar": { const real=parseNum($("#ini_real").value); if(isNaN(real)){ toast("Poné cuánto hay hoy en la cuenta."); return; } const c=cfg(); const x=c.cuentas.find(q=>q.id===el.dataset.id); if(!x) return; if(!x.ini) x.ini={f:c.inicio||todayISO(),m:0}; x.ini.m=Math.round((real-movNeto(x.id,x.mon,x.ini.f))*100)/100; closeForm(); saveCfg(c); toast(x.nombre+" quedó en "+money(real,x.mon)); break; }
+    case "concmes": S.concMes=el.dataset.ym; S.concNuevo=false; S.concEst=null; S.concConf=false; render(); break;
+    case "conccta": S.concCta=el.dataset.id; S.concNuevo=false; S.concEst=null; S.concConf=false; render(); break;
+    case "concnuevo": S.concNuevo=!S.concNuevo; S.concEst=null; render(); break;
+    case "concuno": { const doc=concDoc(); const l=doc&&doc.lineas.find(x=>x.k===el.dataset.k); if(!l) return; const it=lineaAItem(l,doc.cta); openForm(null); Object.assign(F,it); F._orig=null; drawForm(); break; }
+    case "concign": { const doc=clone(concDoc()); doc.ignorados=doc.ignorados||{}; doc.ignorados[el.dataset.k]=true; await saveConc(doc); break; }
+    case "concdesign": { const doc=clone(concDoc()); doc.ignorados={}; await saveConc(doc); break; }
+    case "conctodos": { const doc=concDoc(); if(!doc) return; const r=conciliar(doc); const yms=new Set(); let n=0;
+      for(const l of r.faltan){ if((l.tipo==="x"||l.tipo==="v")&&!l.otra) continue; const it=lineaAItem(l,doc.cta); addItem(it); yms.add(ymOf(it.f)); n++; }
+      render(); for(const ym of yms) await saveMes(ym); toast(n+" movimientos cargados desde el extracto"); break; }
+    case "concborrar": { const doc=concDoc(); if(!doc) return; if(!S.concConf){ S.concConf=true; render(); return; } S.concConf=false; const key=doc.cta+"_"+doc.ym; const m=Object.assign({},S.concs); delete m[key]; S.concs=m; render(); if(db) await db.doc("conciliaciones/"+key).delete().catch(()=>{}); toast("Conciliación borrada"); break; }
     case "calmes": S.calMes=el.dataset.ym; S.calDia=null; render(); break;
     case "caldia": S.calDia=(+el.dataset.d&&S.calDia!==+el.dataset.d)?+el.dataset.d:null; render(); break;
     case "resver2": S.tab="tarjeta"; S.verRes=el.dataset.rid; window.scrollTo(0,0); render(); break;
@@ -1512,6 +1645,7 @@ document.addEventListener("change", async ev=>{
   }
   if(t.id==="impFile"&&t.files&&t.files[0]){ procesarResumen(t.files[0]); return; }
   if(t.id==="facFile"&&t.files&&t.files[0]){ procesarFactura(t.files[0]); return; }
+  if(t.id==="concFile"&&t.files&&t.files[0]){ procesarExtracto(t.files[0]); return; }
   if(t.id==="fa_c"&&S.fac){ const g=id=>$("#"+id).value; Object.assign(S.fac,{empresa:g("fa_e"),servicio:g("fa_s"),monto:parseNum(g("fa_m")),vence:g("fa_v"),periodo:g("fa_p"),cat:t.value,sub:(cfg().cats.gasto[t.value]||[])[0]||""}); if(isNaN(S.fac.monto)) S.fac.monto=null; delete t.dataset.dirty; render(); return; }
   if(t.id==="diaDepto"){ const d=parseInt(t.value,10); if(!(d>=1&&d<=31)) return; const pc=pagosCfg(); pc.diaDepto=d; S.pagosCfg=pc; render(); await save("config/pagos",pc); return; }
   if(t.id==="impCtaRev"){ S.imp.cta=t.value; S.imp.rid=t.value+"_"+(S.imp.cierre||todayISO()); return; }
@@ -1717,6 +1851,7 @@ async function iniciarApp(session){
   db.doc("config/cartera").onSnapshot(d=>{ S.cartera=d.exists?d.data():{items:[],snaps:{}}; render(); }, onErr);
   db.doc("config/pagos").onSnapshot(d=>{ S.pagosCfg=d.exists?d.data():null; render(); }, onErr);
   db.collection("facturas").onSnapshot(snap=>{ const m={}; snap.docs.forEach(d=>{ m[d.id]=d.data(); }); S.facturas=m; render(); }, onErr);
+  db.collection("conciliaciones").onSnapshot(snap=>{ const m={}; snap.docs.forEach(d=>{ m[d.id]=d.data(); }); S.concs=m; render(); }, onErr);
 }
 
 

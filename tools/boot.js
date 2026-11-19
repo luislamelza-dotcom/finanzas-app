@@ -76,6 +76,7 @@ async function iniciarApp(session){
   db.doc("config/cartera").onSnapshot(d=>{ S.cartera=d.exists?d.data():{items:[],snaps:{}}; render(); }, onErr);
   db.doc("config/pagos").onSnapshot(d=>{ S.pagosCfg=d.exists?d.data():null; render(); }, onErr);
   db.collection("facturas").onSnapshot(snap=>{ const m={}; snap.docs.forEach(d=>{ m[d.id]=d.data(); }); S.facturas=m; render(); }, onErr);
+  db.collection("conciliaciones").onSnapshot(snap=>{ const m={}; snap.docs.forEach(d=>{ m[d.id]=d.data(); }); S.concs=m; render(); }, onErr);
 }
 
 
