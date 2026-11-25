@@ -274,6 +274,7 @@ html:root[data-paleta="deco"][data-paleta]{--bg:#0B0A0A;--surface:#151211;--sunk
       <button data-tab="inv">Inversiones</button>
       <button data-tab="tarjeta">Resumen de tarjeta</button>
       <button data-tab="depto">Depto</button>
+      <button data-tab="deudas">Deudas</button>
       <button data-tab="ajustes">Ajustes</button>
     </nav>
   </div>
@@ -421,12 +422,13 @@ function removeItem(id){
 
 /* ---------- Cálculos ---------- */
 function resumen(list,mon){
-  const r={ing:0,gas:0,inv:0,dep:0,porCat:{},porSub:{},porIng:{}};
+  const r={ing:0,gas:0,inv:0,dep:0,deu:0,porCat:{},porSub:{},porIng:{}}; const dIds=deudaIds();
   for(const it of list){
     const u=itV(it,mon);
     if(it.t==="i"){ r.ing+=u; r.porIng[it.cat]=(r.porIng[it.cat]||0)+u; }
     else if(it.t==="g"){ r.gas+=u; r.porCat[it.cat]=(r.porCat[it.cat]||0)+u; const k=it.cat+"›"+(it.sub||"—"); r.porSub[k]=(r.porSub[k]||0)+u; }
     else if(it.t==="h"){ if(it.cta!==FONDO) r.dep+=u; }
+    else if(it.t==="x"&&dIds.has(it.cta2)){ r.deu+=u; }
     else if(it.t==="v"){ r.inv+=u; } else if(it.t==="r"){ r.inv-=u; }
   }
   return r;
@@ -458,7 +460,7 @@ function doRender(){
   if(!S.loaded.meses && !offline){ return; }
   let h="";
   if(offline) h+=`<div class="banner">No hay conexión con la base de datos en esta vista. Podés mirar, pero los cambios no se guardan.</div>`;
-  h += ({resumen:vResumen,movs:vMovs,pagos:vPagos,conc:vConc,cuentas:vCuentas,inv:vInv,tarjeta:vTarjeta,depto:vDepto,ajustes:vAjustes}[S.tab]||vResumen)();
+  h += ({resumen:vResumen,movs:vMovs,pagos:vPagos,conc:vConc,cuentas:vCuentas,inv:vInv,tarjeta:vTarjeta,depto:vDepto,deudas:vDeudas,ajustes:vAjustes}[S.tab]||vResumen)();
   const keepScroll=window.scrollY;
   const keep=[], act=document.activeElement;
   main.querySelectorAll("[data-dirty]").forEach(e=>{ const k=e.id?"#"+e.id:e.dataset.ini?`[data-ini="${e.dataset.ini}"]`:e.dataset.inif?`[data-inif="${e.dataset.inif}"]`:null; if(k) keep.push([k,e.value,e===act,e.selectionStart]); });
@@ -470,7 +472,7 @@ function doRender(){
 
 /* ---------- Vista: Resumen ---------- */
 function vResumen(){
-  const y=S.year, list=desdeInicio(items(y)), r=resumen(list), ahorro=r.ing-r.gas-r.dep;
+  const y=S.year, list=desdeInicio(items(y)), r=resumen(list), ahorro=r.ing-r.gas-r.dep-r.deu;
   const meta=(cfg().metas[y]||{}).inv||0;
   const hist = list.some(i=>i.src==="planilla");
   let h="";
@@ -480,7 +482,8 @@ function vResumen(){
     <div class="kpi"><span class="lab">Ingresos ${y}</span><span class="val in">${V(r.ing)}</span><span class="sub">${Object.keys(r.porIng).length} fuentes</span></div>
     <div class="kpi"><span class="lab">Gastos ${y}</span><span class="val out">${V(r.gas)}</span><span class="sub">${list.filter(i=>i.t==="g").length} movimientos</span></div>
     <div class="kpi"><span class="lab">Depto</span><span class="val" style="color:var(--accent)">${V(r.dep)}</span><span class="sub">${list.filter(i=>i.t==="h"&&i.cat==="Cuota").length} cuotas pagadas en ${y}</span></div>
-    <div class="kpi"><span class="lab">Ahorro</span><span class="val">${V(ahorro)}</span><span class="sub">${r.ing?Math.round(ahorro/r.ing*100):0}% de lo que entró, después de gastos y depto</span></div>
+    ${r.deu||deudaIds().size?`<div class="kpi"><span class="lab">Deudas</span><span class="val" style="color:var(--warn)">${V(r.deu)}</span><span class="sub">Pagado en ${y} · <a href="#" data-act="tab" data-tab="deudas">ver</a></span></div>`:""}
+    <div class="kpi"><span class="lab">Ahorro</span><span class="val">${V(ahorro)}</span><span class="sub">${r.ing?Math.round(ahorro/r.ing*100):0}% de lo que entró, después de gastos, depto${r.deu?" y deudas":""}</span></div>
     <div class="kpi"><span class="lab">Invertido</span><span class="val inv">${V(r.inv)}</span><span class="sub">${meta?Math.round(resumen(list,"USD").inv/meta*100)+"% de la meta de "+usd(meta):"Sin meta anual · <a href=\"#\" data-act=\"tab\" data-tab=\"inv\">definir</a>"}</span></div>
   </section>`;
   h+=`<section class="card"><div class="sec-h"><h2>Mes a mes</h2><p><span class="in">■</span> ingresos <span class="out">■</span> gastos <span class="inv">■</span> invertido · en ${S.vista==="USD"?"US$":"pesos"}</p></div><div class="chart" id="chartMeses">${chartMeses(y)}<div class="tip" id="chartTip" hidden></div></div></section>`;
@@ -502,7 +505,7 @@ function vResumen(){
 }
 function chartMeses(y){
   const W=720,H=230,pl=48,pr=8,pt=12,pb=28; const iw=W-pl-pr, ih=H-pt-pb;
-  const data=MES.map((m,i)=>{ const ym=y+"-"+String(i+1).padStart(2,"0"); const r=resumen(desdeInicio(items(ym))); return {m,ing:r.ing,gas:r.gas,inv:Math.max(0,r.inv),dep:r.dep,ym}; });
+  const data=MES.map((m,i)=>{ const ym=y+"-"+String(i+1).padStart(2,"0"); const r=resumen(desdeInicio(items(ym))); return {m,ing:r.ing,gas:r.gas,inv:Math.max(0,r.inv),dep:r.dep,deu:r.deu,ym}; });
   const max=Math.max(1,...data.map(d=>Math.max(d.ing,d.gas,d.inv)));
   const step=niceStep(max/3); const top=Math.ceil(max/step)*step;
   const sy=v=>pt+ih-(v/top)*ih; const gw=iw/12, bw=Math.min(14,(gw-8)/3);
@@ -520,7 +523,7 @@ let CH=null;
 function showTip(i,ev){
   const box=$("#chartMeses"), tip=$("#chartTip"); if(!box||!tip||!CH||!CH[i]) return;
   const d=CH[i]; document.querySelectorAll("#chartMeses .hit").forEach(r=>r.classList.toggle("on",+r.dataset.mi===i));
-  tip.innerHTML=`<b>${MES_L[i]} ${S.year}</b><div class="l"><span class="in">Ingresos</span><span>${V(d.ing)}</span></div><div class="l"><span class="out">Gastos</span><span>${V(d.gas)}</span></div>${d.dep?`<div class="l"><span style="color:var(--accent)">Depto</span><span>${V(d.dep)}</span></div>`:""}<div class="l"><span class="inv">Invertido</span><span>${V(d.inv)}</span></div><div class="l" style="border-top:1px solid var(--line);padding-top:3px"><span>Neto</span><span>${V(d.ing-d.gas-d.dep,{sign:true})}</span></div>`;
+  tip.innerHTML=`<b>${MES_L[i]} ${S.year}</b><div class="l"><span class="in">Ingresos</span><span>${V(d.ing)}</span></div><div class="l"><span class="out">Gastos</span><span>${V(d.gas)}</span></div>${d.dep?`<div class="l"><span style="color:var(--accent)">Depto</span><span>${V(d.dep)}</span></div>`:""}${d.deu?`<div class="l"><span style="color:var(--warn)">Deudas</span><span>${V(d.deu)}</span></div>`:""}<div class="l"><span class="inv">Invertido</span><span>${V(d.inv)}</span></div><div class="l" style="border-top:1px solid var(--line);padding-top:3px"><span>Neto</span><span>${V(d.ing-d.gas-d.dep-d.deu,{sign:true})}</span></div>`;
   tip.hidden=false;
   const br=box.getBoundingClientRect(), rr=ev.target.getBoundingClientRect(); const tw=tip.offsetWidth, th=tip.offsetHeight;
   let x=rr.right-br.left+6; if(x+tw>br.width) x=rr.left-br.left-tw-6; x=Math.max(0,x);
@@ -543,7 +546,7 @@ function vMovs(){
   <section class="kpis">
     <div class="kpi"><span class="lab">Ingresos ${MES_L[S.month-1]}</span><span class="val in">${V(r.ing)}</span></div>
     <div class="kpi"><span class="lab">Gastos</span><span class="val out">${V(r.gas)}</span></div>
-    <div class="kpi"><span class="lab">Neto</span><span class="val">${V(r.ing-r.gas-r.dep,{sign:true})}</span><span class="sub">${r.dep?"Depto "+V(r.dep)+" · ":""}Invertido ${V(r.inv)}</span></div>
+    <div class="kpi"><span class="lab">Neto</span><span class="val">${V(r.ing-r.gas-r.dep-r.deu,{sign:true})}</span><span class="sub">${r.dep?"Depto "+V(r.dep)+" · ":""}${r.deu?"Deudas "+V(r.deu)+" · ":""}Invertido ${V(r.inv)}</span></div>
     <div class="kpi"><span class="lab">MEP del mes</span><label class="row" style="gap:6px"><span class="muted">$</span><input id="tcMes" class="num" style="width:110px;padding:5px 8px;border:1px solid var(--line);border-radius:7px;background:var(--bg)" inputmode="decimal" value="${tc?fmtN(tc,2):""}" placeholder="${mepActual()?fmtN(mepActual(),2):"sin dato"}" data-ym="${ym}"></label><span class="sub">Se usa para pasar los pesos a dólares</span></div>
   </section>
   <section class="filters">
@@ -563,7 +566,7 @@ function movTable(list){
   return `<div class="tablewrap"><table><thead><tr><th>Fecha</th><th>Detalle</th><th class="hide-sm">Categoría</th><th class="hide-sm">Cuenta</th><th class="r">Monto</th>${S.vista==="USD"?'<th class="r">US$</th>':""}</tr></thead><tbody>${
     rows.map(it=>{ const u=itUSD(it); const cls=it.t==="i"?"in":it.t==="g"||it.t==="h"?"out":"inv";
       const cat = it.t==="h" ? "Depto › "+esc(it.cat)+(it.n?` <span class="muted">${it.n}/${(cfg().depto||{}).plazo||"?"}</span>`:"") : it.t==="g"||it.t==="i" ? esc(it.cat)+(it.sub?` <span class="muted">› ${esc(it.sub)}</span>`:"") : (it.t==="x"?"→ "+esc(cuentaNombre(it.cta2)):"→ "+esc(cuentaNombre(it.cta2||(it.t==="r"?it.cta:"bullmarket"))));
-      return `<tr class="click" data-act="edit" data-id="${it.id}"><td class="num">${fechaTxt(it.f)}</td><td class="desc"><span class="tag ${it.t}">${TIPOS[it.t]}</span> ${esc(it.d||it.cat)}${it.rid&&it.src==="tarjeta"?` <span class="tag">${esc(cuentaNombre(it.cta))}</span>`:""}<div class="muted" style="font-size:.8rem;display:none" data-sm>${cat}</div></td><td class="hide-sm">${cat}</td><td class="hide-sm">${esc(cuentaNombre(it.cta))}</td>${S.vista==="USD"?`<td class="r num">${money(it.m,it.mon)}</td><td class="r num ${cls}">${it.t==="g"||it.t==="h"?"−":it.t==="i"?"+":""}${usd(u).replace("US$ ","")}</td>`:`<td class="r num ${cls}">${it.t==="g"||it.t==="h"?"−":it.t==="i"?"+":""}${money(it.m,it.mon).replace("−","")}${it.mon==="USD"?`<div class="muted" style="font-size:.76rem">≈ ${ars(itARS(it))}</div>`:""}</td>`}</tr>`; }).join("")
+      return `<tr class="click" data-act="edit" data-id="${it.id}"><td class="num">${fechaTxt(it.f)}</td><td class="desc"><span class="tag ${it.t}">${esPagoDeuda(it)?"Pago de deuda":TIPOS[it.t]}</span> ${esc(it.d||it.cat)}${it.rid&&it.src==="tarjeta"?` <span class="tag">${esc(cuentaNombre(it.cta))}</span>`:""}<div class="muted" style="font-size:.8rem;display:none" data-sm>${cat}</div></td><td class="hide-sm">${cat}</td><td class="hide-sm">${esc(cuentaNombre(it.cta))}</td>${S.vista==="USD"?`<td class="r num">${money(it.m,it.mon)}</td><td class="r num ${cls}">${it.t==="g"||it.t==="h"?"−":it.t==="i"?"+":""}${usd(u).replace("US$ ","")}</td>`:`<td class="r num ${cls}">${it.t==="g"||it.t==="h"?"−":it.t==="i"?"+":""}${money(it.m,it.mon).replace("−","")}${it.mon==="USD"?`<div class="muted" style="font-size:.76rem">≈ ${ars(itARS(it))}</div>`:""}</td>`}</tr>`; }).join("")
   }</tbody></table></div><p class="muted" style="font-size:.82rem;margin:8px 2px 0">${rows.length} movimientos</p>`;
 }
 
@@ -1104,6 +1107,50 @@ ${text?`Contenido del extracto:\n<<<\n${text.slice(0,60000)}\n>>>`:"El extracto 
 }
 function saveConc(doc){ S.concs=Object.assign({},S.concs,{[doc.cta+"_"+doc.ym]:doc}); render(); return save("conciliaciones/"+doc.cta+"_"+doc.ym,doc); }
 
+/* ---------- Deudas personales (aparte del depto) ---------- */
+function deudaIds(){ return new Set(cfg().cuentas.filter(c=>c.tipo==="deuda").map(c=>c.id)); }
+function esPagoDeuda(it,ids){ return it.t==="x"&&(ids||deudaIds()).has(it.cta2); }
+function infoDeuda(c,sal){ const falta=-(((sal||saldos())[c.id].bal||{})[c.mon]||0); const total=c.total||(c.ini?-c.ini.m:0); const pag=Math.max(0,total-falta); return {falta,total,pag,pct:total?Math.min(100,pag/total*100):0}; }
+function vDeudas(){
+  const sal=saldos(), tc=mepActual(), c=cfg();
+  const ds=c.cuentas.filter(k=>k.tipo==="deuda"&&!k.arch), arch=c.cuentas.filter(k=>k.tipo==="deuda"&&k.arch);
+  const enV=(v,mon)=>S.vista==="USD"?(mon==="USD"?v:(tc?v/tc:0)):(mon==="USD"?v*(tc||0):v);
+  let falta=0, pagAnio=0; const y=todayISO().slice(0,4), ids=deudaIds();
+  ds.forEach(k=>{ const i=infoDeuda(k,sal); if(i.falta>0) falta+=enV(i.falta,k.mon); });
+  items(y).filter(it=>esPagoDeuda(it,ids)).forEach(it=>{ pagAnio+=itV(it); });
+  let h=`<section class="kpis">
+    <div class="kpi"><span class="lab">Lo que debés</span><span class="val out">${V(falta)}</span><span class="sub">${ds.length} deuda${ds.length===1?"":"s"} · al MEP $ ${tc?fmtN(tc,0):"—"}</span></div>
+    <div class="kpi"><span class="lab">Pagado en ${y}</span><span class="val">${V(pagAnio)}</span><span class="sub">Se resta del ahorro en el Resumen, aparte de los gastos</span></div>
+  </section>`;
+  h+=ds.map(k=>{ const i=infoDeuda(k,sal); const ed=S.deudaEdit===k.id;
+    const pagos=items("").filter(it=>it.cta2===k.id||it.cta===k.id).sort(ordenMov);
+    return `<section class="card"><div class="sec-h"><h2>${esc(k.nombre)}</h2><span class="tag">${k.mon==="USD"?"US$":"$"}${k.recordatorio==="ultimoLunes"?" · recordatorio el último lunes del mes":""}</span></div>
+      <div class="acct"><div class="bal">${i.falta>0.005?"Faltan "+money(i.falta,k.mon):"¡Saldada!"}</div>
+      <div class="progress" role="img" aria-label="Pagado ${Math.round(i.pct)}%"><div style="width:${i.pct.toFixed(1)}%;background:var(--in)"></div></div>
+      <div class="muted" style="font-size:.84rem">Pagado ${money(i.pag,k.mon)} de ${money(i.total,k.mon)} (${Math.round(i.pct)}%)${k.mon==="USD"&&tc&&i.falta>0?` · lo que falta ≈ ${ars(i.falta*tc)}`:""}</div>
+      <div class="row" style="gap:6px;margin-top:4px">${i.falta>0.005?`<button class="btn sm pri" data-act="pagardeuda" data-id="${k.id}">Pagar</button>`:""}<button class="btn sm" data-act="deudaedit" data-id="${k.id}">${ed?"Cerrar":"Editar"}</button><button class="btn sm" data-act="deudaarch" data-id="${k.id}">${S.deudaConf===k.id?"¿Archivar?":"Archivar"}</button></div></div>
+      ${ed?`<form id="deudaForm" data-id="${k.id}" class="formgrid" style="margin-top:14px">
+        <label class="field">Nombre<input id="dd_n" value="${esc(k.nombre)}" required></label>
+        <label class="field">Monto total (${k.mon==="USD"?"US$":"$"})<input id="dd_t" class="num" inputmode="decimal" value="${fmtN(i.total,2)}" required></label>
+        <label class="field">Desde<input id="dd_f" type="date" value="${esc(k.ini?k.ini.f:todayISO())}"></label>
+        <label class="field" style="align-self:end;display:flex;gap:8px;align-items:center;color:var(--ink)"><input id="dd_r" type="checkbox" ${k.recordatorio==="ultimoLunes"?"checked":""}> Recordatorio el último lunes del mes</label>
+        <div class="field" style="align-self:end"><button class="btn pri" type="submit">Guardar</button></div></form>`:""}
+      ${pagos.length?`<h3 style="margin:16px 0 6px">Pagos</h3><ul class="list-plain venc">${pagos.map(it=>`<li class="click" data-act="edit" data-id="${it.id}" style="cursor:pointer"><span class="venc-f num">${fechaTxt(it.f)}</span><span class="venc-t"><b>${money(it.cta2===k.id?(it.m2!=null?it.m2:it.m):-it.m,it.cta2===k.id?(it.mon2||it.mon):it.mon)}</b><span class="muted" style="font-size:.82rem">desde ${esc(cuentaNombre(it.cta2===k.id?it.cta:it.cta2))}</span></span></li>`).join("")}</ul>`:`<p class="muted" style="margin:12px 0 0">Todavía no cargaste pagos.</p>`}
+    </section>`; }).join("");
+  h+=`<section class="card"><div class="sec-h"><h2>Agregar una deuda</h2><p>Préstamos de familia, amigos o conocidos. El depto sigue aparte, en su pestaña.</p></div>
+    <form id="deudaNueva" class="formgrid">
+      <label class="field">Nombre<input id="dn_n" placeholder="Ej: Préstamo personal" required></label>
+      <label class="field">Monto total<input id="dn_t" class="num" inputmode="decimal" required></label>
+      <label class="field">Moneda<select id="dn_m"><option value="USD">Dólares</option><option value="ARS">Pesos</option></select></label>
+      <label class="field">Ya pagado antes (opcional)<input id="dn_p" class="num" inputmode="decimal" placeholder="0"></label>
+      <label class="field" style="align-self:end;display:flex;gap:8px;align-items:center;color:var(--ink)"><input id="dn_r" type="checkbox" checked> Recordatorio el último lunes del mes</label>
+      <div class="field" style="align-self:end"><button class="btn pri" type="submit">Agregar</button></div>
+    </form>
+    ${arch.length?`<p class="muted" style="margin:12px 0 0;font-size:.85rem">Archivadas: ${arch.map(a=>`${esc(a.nombre)} <button class="btn sm" data-act="unarch" data-id="${a.id}">Reactivar</button>`).join(" ")}</p>`:""}
+  </section>`;
+  return h;
+}
+
 /* ---------- Vista: Cuentas ---------- */
 function vCuentas(){
   const sal=saldos(), tc=mepActual();
@@ -1135,7 +1182,7 @@ function vCuentas(){
     <div class="kpi"><span class="lab">Patrimonio</span><span class="val">${V(tot+(S.vista==="USD"?cart.valor:cart.valor*(tc||0))-deudaTot)}</span><span class="sub">Disponible + inversiones − tarjetas${deudas.length?" − deudas ("+V(deudaTot)+")":""}</span></div>
   </section>
   <section class="acct-grid">${cards}</section>
-  ${deudas.length?`<section><div class="sec-h"><h2>Deudas</h2><p>Cada pago se carga como transferencia hacia la deuda: baja lo que debés y no cuenta como gasto</p></div><div class="acct-grid">${dcards}</div></section>`:""}
+  ${deudas.length?`<p class="muted" style="margin:0;font-size:.86rem">Tus deudas (${V(deudaTot)}) están en la pestaña <a href="#" data-act="tab" data-tab="deudas">Deudas</a> y se restan del patrimonio.</p>`:""}
   <section class="card"><div class="sec-h"><h2>Agregar cuenta</h2></div>
     <form class="formgrid" id="newCta">
       <label class="field">Nombre<input id="nc_n" required placeholder="Ej: Brubank"></label>
@@ -1572,6 +1619,8 @@ document.addEventListener("click", async ev=>{
     case "ftipo": readForm(); F.t=el.dataset.t; if(F.t==="h"){ F.cat="Cuota"; F.sub=""; F.n=proxCuota(); if(!F.d) F.d=""; } if(F.t==="g"){F.cat="Supermercado";F.sub="Súper y almacén";} if(F.t==="i"){F.cat="Sueldo";F.sub="";} if(F.t==="v"){F.cta2="bullmarket";} if(F.t==="r"){F.cta="bullmarket";F.cta2="nacion_usd";} if(F.t==="x"){F.cta2=F.cta==="nacion"?"uala":"nacion";} drawForm(); break;
     case "delmov": { if(!F._orig) return; if(el.dataset.sure!=="1"){ el.dataset.sure="1"; el.textContent="Tocá de nuevo para borrar"; return; } const k=removeItem(F._orig); closeForm(); render(); if(k) await saveMes(k); toast("Movimiento borrado"); break; }
     case "ini": iniSheet(el.dataset.id); break;
+    case "deudaedit": S.deudaEdit=S.deudaEdit===el.dataset.id?null:el.dataset.id; render(); break;
+    case "deudaarch": { const id=el.dataset.id; if(S.deudaConf!==id){ S.deudaConf=id; render(); return; } S.deudaConf=null; const c=cfg(); const k=c.cuentas.find(x=>x.id===id); if(k){ k.arch=true; saveCfg(c); toast(k.nombre+" archivada"); } break; }
     case "pagardeuda": { const c=cfg().cuentas.find(x=>x.id===el.dataset.id); if(!c) return; openForm(null); F.t="x"; F.mon=c.mon; F.cta=c.mon==="USD"?(cuentas(false).some(x=>x.id==="efectivo_usd")?"efectivo_usd":"nacion_usd"):"nacion"; F.cta2=c.id; F.m=""; F.d="Pago "+c.nombre; F.f=todayISO(); drawForm(); break; }
     case "igualar": { const real=parseNum($("#ini_real").value); if(isNaN(real)){ toast("Poné cuánto hay hoy en la cuenta."); return; } const c=cfg(); const x=c.cuentas.find(q=>q.id===el.dataset.id); if(!x) return; if(!x.ini) x.ini={f:c.inicio||todayISO(),m:0}; x.ini.m=Math.round((real-movNeto(x.id,x.mon,x.ini.f))*100)/100; closeForm(); saveCfg(c); toast(x.nombre+" quedó en "+money(real,x.mon)); break; }
     case "concmes": S.concMes=el.dataset.ym; S.concNuevo=false; S.concEst=null; S.concConf=false; render(); break;
@@ -1627,6 +1676,10 @@ document.addEventListener("submit", async ev=>{
   if(f.id==="iniForm"){ const c=cfg(); const x=c.cuentas.find(q=>q.id===f.dataset.id); const m=parseNum($("#ini_m").value); const d=$("#ini_f").value; if(isNaN(m)||!d){ toast("Completá fecha y saldo."); return; } x.ini={m,f:d}; closeForm(); saveCfg(c); toast("Saldo guardado"); return; }
   if(f.id==="newCta"){ const c=cfg(); const n=$("#nc_n").value.trim(); if(!n) return; c.cuentas.push({id:norm(n).replace(/[^a-z0-9]+/g,"_")+"_"+uid().slice(-3),nombre:n,tipo:$("#nc_t").value,mon:$("#nc_m").value}); saveCfg(c); toast("Cuenta agregada"); return; }
   if(f.id==="iniBulk"){ const c=cfg(); const ini=c.inicio; let n=0; f.querySelectorAll("[data-ini]").forEach(inp=>{ const v=parseNum(inp.value); const k=c.cuentas.find(x=>x.id===inp.dataset.ini); if(!k) return; const fe=f.querySelector(`[data-inif="${inp.dataset.ini}"]`); if(isNaN(v)){ delete k.ini; } else { k.ini={m:v,f:(fe&&fe.value)||ini}; n++; } }); saveCfg(c); toast(n+" saldos guardados"); return; }
+  if(f.id==="deudaNueva"){ const n=$("#dn_n").value.trim(), t=parseNum($("#dn_t").value), pg=parseNum($("#dn_p").value), mon=$("#dn_m").value; if(!n||isNaN(t)||t<=0){ toast("Poné nombre y monto total."); return; }
+    const c=cfg(); c.cuentas.push({id:"deuda_"+uid(),nombre:n,tipo:"deuda",mon,total:t,ini:{f:todayISO(),m:-(t-(isNaN(pg)?0:pg))},recordatorio:$("#dn_r").checked?"ultimoLunes":null}); saveCfg(c); toast("Deuda agregada"); return; }
+  if(f.id==="deudaForm"){ const c=cfg(); const k=c.cuentas.find(x=>x.id===f.dataset.id); if(!k) return; const t=parseNum($("#dd_t").value); if(isNaN(t)||t<=0){ toast("Poné el monto total."); return; }
+    const yaPag=(k.total||(k.ini?-k.ini.m:0))+(k.ini?k.ini.m:0); k.nombre=$("#dd_n").value.trim()||k.nombre; k.total=t; k.ini={f:$("#dd_f").value||(k.ini&&k.ini.f)||todayISO(),m:-(t-yaPag)}; k.recordatorio=$("#dd_r").checked?"ultimoLunes":null; S.deudaEdit=null; saveCfg(c); toast("Deuda actualizada"); return; }
   if(f.id==="facForm"){ const g=id=>$("#"+id).value; const m=parseNum(g("fa_m")), v=g("fa_v"); if(isNaN(m)||!v){ toast("Completá monto y vencimiento."); return; }
     const doc={id:uid(),empresa:g("fa_e").trim(),servicio:g("fa_s").trim(),monto:m,mon:"ARS",vence:v,vence2:S.fac&&S.fac.vence2||null,periodo:g("fa_p").trim(),cat:g("fa_c"),sub:g("fa_sub"),archivo:S.fac&&S.fac.archivo||"",cargada:todayISO()};
     S.facturas=Object.assign({},S.facturas,{[doc.id]:doc}); S.fac=null; S.calMes=ymOf(v); S.calDia=null; render(); await save("facturas/"+doc.id,doc); toast("Factura agregada al calendario"); return; }
