@@ -327,7 +327,7 @@ const TIPOS = {g:"Gasto",i:"Ingreso",h:"Depto",v:"Inversión",r:"Rescate",x:"Tra
 const DEPTO_CATS = ["Cuota","Anticipo","Escritura y gastos","Precancelación","Otros del depto"];
 const MES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 const MES_L = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
-const TIPO_CTA = {banco:"Banco",billetera:"Billetera",efectivo:"Efectivo",broker:"Broker",ahorro:"Ahorro",tarjeta:"Tarjeta de crédito"};
+const TIPO_CTA = {banco:"Banco",billetera:"Billetera",efectivo:"Efectivo",broker:"Broker",ahorro:"Ahorro",tarjeta:"Tarjeta de crédito",deuda:"Deuda (lo que debés)"};
 const FONDO="fondo_depto";
 
 /* ---------- Temas ---------- */
@@ -847,6 +847,12 @@ function vencimientos(ym){
   // Pagos fijos de todos los meses
   for(const fx of pc.fijos){ if(fx.desde&&ym<fx.desde) continue; const k="fijo:"+fx.id+":"+ym;
     out.push({key:k,tipo:"fijo",f:fechaDia(ym,fx.dia||1),titulo:fx.nombre,det:"Todos los meses"+(fx.cat?" · "+fx.cat:""),monto:fx.monto||0,mon:fx.mon||"ARS",pagado:!!pagoDe(k),fijo:fx}); }
+  // Deudas con recordatorio el lunes de la última semana del mes
+  const salD=saldos();
+  for(const k of cuentas(false).filter(c=>c.tipo==="deuda"&&c.recordatorio==="ultimoLunes")){ const falta=-((salD[k.id].bal||{})[k.mon]||0); const ini=k.ini&&k.ini.f.slice(0,7);
+    const pag=all.some(i=>i.cta2===k.id&&ymOf(i.f)===ym); if(falta<=0.005&&!pag) continue; if(ini&&ym<ini) continue;
+    const d=new Date(+ym.slice(0,4),+ym.slice(5),0); d.setDate(d.getDate()-((d.getDay()+6)%7));
+    out.push({key:"deuda:"+k.id+":"+ym,tipo:"deuda",f:fechaDia(ym,d.getDate()),titulo:"Pago "+k.nombre,det:"Lo que puedas este mes · faltan "+money(Math.max(falta,0),k.mon),monto:0,mon:k.mon,pagado:pag,cta:k.id}); }
   // Cuota del depto (si está cargado el préstamo)
   const d=depCfg(); if(d.cuotaUVA&&d.primera&&ym>=d.primera){ const uh=uvaHoy(); const pag=all.some(i=>i.t==="h"&&i.cat==="Cuota"&&ymOf(i.f)===ym);
     out.push({key:"depto:"+ym,tipo:"depto",f:fechaDia(ym,pc.diaDepto||10),titulo:"Cuota del depto",det:"N° "+kDeFecha(ym+"-15")+" · "+fmtN(d.cuotaUVA,2)+" UVA",monto:uh?Math.round(d.cuotaUVA*uh):0,mon:"ARS",pagado:pag}); }
@@ -879,8 +885,8 @@ function vPagos(){
   // Lista
   const lista=S.calDia?vs.filter(v=>+v.f.slice(8,10)===S.calDia):vs;
   h+=`<section class="card"><div class="sec-h"><h2>${S.calDia?S.calDia+" de "+MES_L[m-1]:"Vencimientos del mes"}</h2>${S.calDia?`<button class="btn sm" data-act="caldia" data-d="0">Ver todo el mes</button>`:""}</div>
-    ${lista.length?`<ul class="list-plain venc">${lista.map(v=>`<li><span class="venc-f num">${fechaTxt(v.f)}</span><span class="venc-t"><b>${esc(v.titulo)}</b><span class="muted" style="font-size:.82rem">${esc(v.det||"")}</span></span><span class="venc-m num">${money(v.monto,v.mon)}</span><span class="tag" style="background:color-mix(in srgb,${EST[v.estado].c} 16%,transparent);color:${EST[v.estado].c}">${EST[v.estado].n}</span>
-      <span class="row" style="gap:6px">${v.pagado?"":v.tipo==="tarjeta"?`<button class="btn sm pri" data-act="resver2" data-rid="${esc(v.rid)}">Pagar</button>`:v.tipo==="depto"?`<button class="btn sm pri" data-act="nuevacuota">Pagar</button>`:`<button class="btn sm pri" data-act="pagarv" data-k="${esc(v.key)}">Pagar</button>`}${v.tipo==="factura"?`<button class="btn sm danger" data-act="facdel" data-id="${esc(v.fac.id)}">${S.confirmFac===v.fac.id?"¿Borrar?":"Borrar"}</button>`:""}</span></li>`).join("")}</ul>`
+    ${lista.length?`<ul class="list-plain venc">${lista.map(v=>`<li><span class="venc-f num">${fechaTxt(v.f)}</span><span class="venc-t"><b>${esc(v.titulo)}</b><span class="muted" style="font-size:.82rem">${esc(v.det||"")}</span></span><span class="venc-m num">${v.monto||v.tipo!=="deuda"?money(v.monto,v.mon):"A definir"}</span><span class="tag" style="background:color-mix(in srgb,${EST[v.estado].c} 16%,transparent);color:${EST[v.estado].c}">${EST[v.estado].n}</span>
+      <span class="row" style="gap:6px">${v.pagado?"":v.tipo==="tarjeta"?`<button class="btn sm pri" data-act="resver2" data-rid="${esc(v.rid)}">Pagar</button>`:v.tipo==="depto"?`<button class="btn sm pri" data-act="nuevacuota">Pagar</button>`:v.tipo==="deuda"?`<button class="btn sm pri" data-act="pagardeuda" data-id="${esc(v.cta)}">Pagar</button>`:`<button class="btn sm pri" data-act="pagarv" data-k="${esc(v.key)}">Pagar</button>`}${v.tipo==="factura"?`<button class="btn sm danger" data-act="facdel" data-id="${esc(v.fac.id)}">${S.confirmFac===v.fac.id?"¿Borrar?":"Borrar"}</button>`:""}</span></li>`).join("")}</ul>`
       :`<p class="muted" style="margin:0">${S.calDia?"Ese día no vence nada.":"No hay vencimientos cargados para este mes."}</p>`}
   </section>`;
   h+=facturaBlock()+fijosBlock();
@@ -1103,7 +1109,16 @@ function vCuentas(){
   const sal=saldos(), tc=mepActual();
   let tot=0, sinIni=0;
   const cart=carteraTotales();
-  const cards=cuentas(true).filter(c=>!c.arch).map(c=>{
+  const deudas=cuentas(false).filter(c=>c.tipo==="deuda"); let deudaTot=0;
+  const dcards=deudas.map(c=>{ const s=sal[c.id]; const falta=-((s.bal||{})[c.mon]||0); const total=c.total||(c.ini?-c.ini.m:0); const pag=Math.max(0,total-falta); const pct=total?Math.min(100,pag/total*100):0;
+    const enV=S.vista==="USD"?(c.mon==="USD"?falta:(tc?falta/tc:0)):(c.mon==="USD"?falta*(tc||0):falta); if(falta>0) deudaTot+=enV;
+    return `<div class="card acct"><div class="row" style="justify-content:space-between"><h3>${esc(c.nombre)}</h3><span class="tag">Deuda · ${c.mon==="USD"?"US$":"$"}</span></div>
+      <div class="bal">${falta>0.005?"Faltan "+money(falta,c.mon):"¡Saldada!"}</div>
+      <div class="progress" role="img" aria-label="Pagado ${Math.round(pct)}%"><div style="width:${pct.toFixed(1)}%;background:var(--in)"></div></div>
+      <div class="muted" style="font-size:.84rem">Pagado ${money(pag,c.mon)} de ${money(total,c.mon)} (${Math.round(pct)}%)${c.mon==="USD"&&tc&&falta>0?` · lo que falta ≈ ${ars(falta*tc)}`:""}</div>
+      <div class="row" style="gap:6px">${falta>0.005?`<button class="btn sm pri" data-act="pagardeuda" data-id="${c.id}">Pagar</button>`:""}<button class="btn sm" data-act="ini" data-id="${c.id}">Ajustar</button></div>
+    </div>`; }).join("");
+  const cards=cuentas(true).filter(c=>!c.arch&&c.tipo!=="deuda").map(c=>{
     const s=sal[c.id]; const bal=s.bal; const ini=c.ini;
     if(!ini) sinIni++;
     const u=Object.entries(bal).reduce((a,[mon,v])=>a+(S.vista==="USD"?(mon==="USD"?v:(tc?v/tc:0)):(mon==="USD"?v*(tc||0):v)),0); if(ini) tot+=u;
@@ -1117,9 +1132,10 @@ function vCuentas(){
   return `<section class="kpis">
     <div class="kpi"><span class="lab">Plata disponible</span><span class="val">${V(tot)}</span><span class="sub">${sinIni?sinIni+" cuentas sin saldo inicial":"Todas las cuentas"} · al MEP $ ${tc?fmtN(tc,0):"—"}</span></div>
     <div class="kpi"><span class="lab">Cartera Bull Market</span><span class="val inv">${V(S.vista==="USD"?cart.valor:cart.valor*(tc||0))}</span><span class="sub">${cart.n} posiciones · ${usd(cart.valor)}</span></div>
-    <div class="kpi"><span class="lab">Patrimonio</span><span class="val">${V(tot+(S.vista==="USD"?cart.valor:cart.valor*(tc||0)))}</span><span class="sub">Disponible + inversiones − tarjetas</span></div>
+    <div class="kpi"><span class="lab">Patrimonio</span><span class="val">${V(tot+(S.vista==="USD"?cart.valor:cart.valor*(tc||0))-deudaTot)}</span><span class="sub">Disponible + inversiones − tarjetas${deudas.length?" − deudas ("+V(deudaTot)+")":""}</span></div>
   </section>
   <section class="acct-grid">${cards}</section>
+  ${deudas.length?`<section><div class="sec-h"><h2>Deudas</h2><p>Cada pago se carga como transferencia hacia la deuda: baja lo que debés y no cuenta como gasto</p></div><div class="acct-grid">${dcards}</div></section>`:""}
   <section class="card"><div class="sec-h"><h2>Agregar cuenta</h2></div>
     <form class="formgrid" id="newCta">
       <label class="field">Nombre<input id="nc_n" required placeholder="Ej: Brubank"></label>
@@ -1556,6 +1572,7 @@ document.addEventListener("click", async ev=>{
     case "ftipo": readForm(); F.t=el.dataset.t; if(F.t==="h"){ F.cat="Cuota"; F.sub=""; F.n=proxCuota(); if(!F.d) F.d=""; } if(F.t==="g"){F.cat="Supermercado";F.sub="Súper y almacén";} if(F.t==="i"){F.cat="Sueldo";F.sub="";} if(F.t==="v"){F.cta2="bullmarket";} if(F.t==="r"){F.cta="bullmarket";F.cta2="nacion_usd";} if(F.t==="x"){F.cta2=F.cta==="nacion"?"uala":"nacion";} drawForm(); break;
     case "delmov": { if(!F._orig) return; if(el.dataset.sure!=="1"){ el.dataset.sure="1"; el.textContent="Tocá de nuevo para borrar"; return; } const k=removeItem(F._orig); closeForm(); render(); if(k) await saveMes(k); toast("Movimiento borrado"); break; }
     case "ini": iniSheet(el.dataset.id); break;
+    case "pagardeuda": { const c=cfg().cuentas.find(x=>x.id===el.dataset.id); if(!c) return; openForm(null); F.t="x"; F.mon=c.mon; F.cta=c.mon==="USD"?(cuentas(false).some(x=>x.id==="efectivo_usd")?"efectivo_usd":"nacion_usd"):"nacion"; F.cta2=c.id; F.m=""; F.d="Pago "+c.nombre; F.f=todayISO(); drawForm(); break; }
     case "igualar": { const real=parseNum($("#ini_real").value); if(isNaN(real)){ toast("Poné cuánto hay hoy en la cuenta."); return; } const c=cfg(); const x=c.cuentas.find(q=>q.id===el.dataset.id); if(!x) return; if(!x.ini) x.ini={f:c.inicio||todayISO(),m:0}; x.ini.m=Math.round((real-movNeto(x.id,x.mon,x.ini.f))*100)/100; closeForm(); saveCfg(c); toast(x.nombre+" quedó en "+money(real,x.mon)); break; }
     case "concmes": S.concMes=el.dataset.ym; S.concNuevo=false; S.concEst=null; S.concConf=false; render(); break;
     case "conccta": S.concCta=el.dataset.id; S.concNuevo=false; S.concEst=null; S.concConf=false; render(); break;
